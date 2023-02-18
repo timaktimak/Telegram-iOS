@@ -110,7 +110,7 @@ public final class SharedAccountContextImpl: SharedAccountContext {
     
     private var groupCallDisposable: Disposable?
     
-    private var callController: CallController?
+    private var callController: ModernCallController?
     public let hasOngoingCall = ValuePromise<Bool>(false)
     private let callState = Promise<PresentationCallState?>(nil)
     
@@ -669,13 +669,17 @@ public final class SharedAccountContextImpl: SharedAccountContext {
                         
                         if let call = call {
                             mainWindow.hostView.containerView.endEditing(true)
-                            let callController = CallController(sharedContext: strongSelf, account: call.context.account, call: call, easyDebugAccess: !GlobalExperimentalSettings.isAppStoreBuild)
+                            let callController = ModernCallController(sharedContext: strongSelf, account: call.context.account, call: call, easyDebugAccess: !GlobalExperimentalSettings.isAppStoreBuild)
                             strongSelf.callController = callController
                             strongSelf.mainWindow?.present(callController, on: .calls)
+
                             strongSelf.callState.set(call.state
                             |> map(Optional.init))
                             strongSelf.hasOngoingCall.set(true)
                             setNotificationCall(call)
+                            
+                            print(call)
+//                            strongSelf.mainWindow?.present(ViewController(navigationBarPresentationData: nil), on: .calls)
                         } else {
                             strongSelf.callState.set(.single(nil))
                             strongSelf.hasOngoingCall.set(false)
