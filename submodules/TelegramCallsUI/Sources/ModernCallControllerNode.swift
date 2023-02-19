@@ -371,6 +371,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     private let videoContainerNode: PinchSourceContainerNode
     
     private let backgroundNode: ModernCallBackgroundNode
+    private let avatarNode: ModernCallAvatarNode
+    private let infoNode: ModernCallInfoNode
 //    private let imageNode: TransformImageNode
     private let dimNode: ASImageNode
     
@@ -490,6 +492,10 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         let accountContext = sharedContext.makeTempAccountContext(account: account)
         self.backgroundNode = ModernCallBackgroundNode(context: accountContext)
         
+        self.avatarNode = ModernCallAvatarNode()
+        
+        self.infoNode = ModernCallInfoNode()
+        
         self.dimNode = ASImageNode()
         self.dimNode.contentMode = .scaleToFill
         self.dimNode.isUserInteractionEnabled = false
@@ -537,14 +543,16 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         
 //        self.containerNode.addSubnode(self.imageNode)
         self.containerNode.addSubnode(self.backgroundNode)
+        self.containerNode.addSubnode(self.avatarNode)
+        self.containerNode.addSubnode(self.infoNode)
 //        self.containerNode.addSubnode(self.videoContainerNode)
 //        self.containerNode.addSubnode(self.dimNode)
 //        self.containerNode.addSubnode(self.statusNode)
         self.containerNode.addSubnode(self.buttonsNode)
 //        self.containerNode.addSubnode(self.toastNode)
-//        self.containerNode.addSubnode(self.keyButtonNode)
-//        self.containerNode.addSubnode(self.backButtonArrowNode)
-//        self.containerNode.addSubnode(self.backButtonNode)
+        self.containerNode.addSubnode(self.keyButtonNode)
+        self.containerNode.addSubnode(self.backButtonArrowNode)
+        self.containerNode.addSubnode(self.backButtonNode)
         
         self.buttonsNode.mute = { [weak self] in
             self?.toggleMute?()
@@ -794,6 +802,10 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     func updatePeer(accountPeer: Peer, peer: Peer, hasOther: Bool) {
         if !arePeersEqual(self.peer, peer) {
             self.peer = peer
+            
+            let context = sharedContext.makeTempAccountContext(account: account)
+            self.avatarNode.avatarNode.setPeer(context: context, theme: presentationData.theme, peer: EnginePeer(peer))
+            
 //            if let peerReference = PeerReference(peer), !peer.profileImageRepresentations.isEmpty {
 ////                let representations: [ImageRepresentationWithReference] = peer.profileImageRepresentations.map({ ImageRepresentationWithReference(representation: $0, reference: .avatar(peer: peerReference, resource: $0.resource)) })
 ////                self.imageNode.setSignal(chatAvatarGalleryPhoto(account: self.account, representations: representations, immediateThumbnailData: nil, autoFetchFullSize: true))
@@ -1635,6 +1647,13 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         transition.updateFrame(node: self.toastNode, frame: CGRect(origin: CGPoint(x: 0.0, y: toastOriginY), size: CGSize(width: layout.size.width, height: toastHeight)))
         transition.updateFrame(node: self.buttonsNode, frame: CGRect(origin: CGPoint(x: 0.0, y: buttonsOriginY), size: CGSize(width: layout.size.width, height: buttonsHeight)))
         transition.updateAlpha(node: self.buttonsNode, alpha: overlayAlpha)
+        
+        let avatarY = navigationBarHeight + 130
+        let avatarSize = CGSize(width: 136, height: 136) // + 18 TODO: timur
+        transition.updateFrame(node: self.avatarNode, frame: CGRect(x: layout.size.width / 2.0 - avatarSize.width / 2.0, y: avatarY, width: avatarSize.width, height: avatarSize.height)) // + 18 TODO: timur devices
+        self.avatarNode.updateLayout(size: avatarSize, transition: transition)
+        
+        transition.updateFrame(node: self.infoNode, frame: CGRect(x: 0, y: avatarY + avatarSize.height, width: layout.size.width, height: 60))
         
         let fullscreenVideoFrame = containerFullScreenFrame
         let previewVideoFrame = self.calculatePreviewVideoRect(layout: layout, navigationHeight: navigationBarHeight)
