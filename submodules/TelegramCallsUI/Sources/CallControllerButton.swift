@@ -44,6 +44,7 @@ final class CallControllerButtonItemNode: HighlightTrackingButtonNode {
             case headphones
             case accept
             case end
+            case cross
             case cancel
             case share
             case screencast
@@ -264,7 +265,7 @@ final class CallControllerButtonItemNode: HighlightTrackingButtonNode {
                 case .mute:
                     image = generateTintedImage(image: UIImage(bundleImageName: "Call/CallMuteButton"), color: imageColor)
                 case .flipCamera:
-                    image = generateTintedImage(image: UIImage(bundleImageName: "Call/CallSwitchCameraButton"), color: imageColor)
+                    image = generateTintedImage(image: UIImage(bundleImageName: "Call/CallFlip"), color: imageColor)
                 case .bluetooth:
                     image = generateTintedImage(image: UIImage(bundleImageName: "Call/CallBluetoothButton"), color: imageColor)
                 case .speaker:
@@ -281,6 +282,8 @@ final class CallControllerButtonItemNode: HighlightTrackingButtonNode {
                     image = generateTintedImage(image: UIImage(bundleImageName: "Call/CallAcceptButton"), color: imageColor)
                 case .end:
                     image = generateTintedImage(image: UIImage(bundleImageName: "Call/CallDeclineButton"), color: imageColor)
+                case .cross:
+                    image = generateTintedImage(image: UIImage(bundleImageName: "Call/CallEndButton"), color: imageColor)
                 case .cancel:
                     image = generateImage(CGSize(width: 28.0, height: 28.0), opaque: false, rotatedContext: { size, context in
                         let bounds = CGRect(origin: CGPoint(), size: size)

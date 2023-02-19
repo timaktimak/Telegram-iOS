@@ -678,7 +678,6 @@ public final class SharedAccountContextImpl: SharedAccountContext {
                             strongSelf.hasOngoingCall.set(true)
                             setNotificationCall(call)
                             
-                            print(call)
 //                            strongSelf.mainWindow?.present(ViewController(navigationBarPresentationData: nil), on: .calls)
                         } else {
                             strongSelf.callState.set(.single(nil))

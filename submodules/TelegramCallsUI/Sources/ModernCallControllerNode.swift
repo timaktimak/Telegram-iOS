@@ -403,7 +403,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     private let backButtonNode: HighlightableButtonNode
     private let statusNode: CallControllerStatusNode
     private let toastNode: CallControllerToastContainerNode
-    private let buttonsNode: CallControllerButtonsNode
+    private let buttonsNode: ModernCallControllerButtonsNode
     private var keyPreviewNode: CallControllerKeyPreviewNode?
     
     private var debugNode: CallDebugNode?
@@ -487,7 +487,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //        self.imageNode = TransformImageNode()
 //        self.imageNode.contentAnimations = [.subsequentUpdates]
         
-        self.backgroundNode = ModernCallBackgroundNode()
+        let accountContext = sharedContext.makeTempAccountContext(account: account)
+        self.backgroundNode = ModernCallBackgroundNode(context: accountContext)
         
         self.dimNode = ASImageNode()
         self.dimNode.contentMode = .scaleToFill
@@ -502,7 +503,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         
         self.statusNode = CallControllerStatusNode()
         
-        self.buttonsNode = CallControllerButtonsNode(strings: self.presentationData.strings)
+        self.buttonsNode = ModernCallControllerButtonsNode(strings: self.presentationData.strings)
         self.toastNode = CallControllerToastContainerNode(strings: self.presentationData.strings)
         self.keyButtonNode = CallControllerKeyButton()
         self.keyButtonNode.accessibilityElementsHidden = false
@@ -539,7 +540,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //        self.containerNode.addSubnode(self.videoContainerNode)
 //        self.containerNode.addSubnode(self.dimNode)
 //        self.containerNode.addSubnode(self.statusNode)
-//        self.containerNode.addSubnode(self.buttonsNode)
+        self.containerNode.addSubnode(self.buttonsNode)
 //        self.containerNode.addSubnode(self.toastNode)
 //        self.containerNode.addSubnode(self.keyButtonNode)
 //        self.containerNode.addSubnode(self.backButtonArrowNode)
@@ -843,6 +844,16 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     }
     
     func updateCallState(_ callState: PresentationCallState) {
+        
+        switch callState.state {
+        case .waiting, .ringing:
+            self.backgroundNode.update(background: .connecting)
+        case .active:
+            self.backgroundNode.update(background: .active)
+        default:
+            break
+        }
+        
         self.callState = callState
         
         let statusValue: CallControllerStatusValue
@@ -1579,6 +1590,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         }
         
         transition.updateFrame(node: self.backgroundNode, frame: containerFullScreenFrame)
+        self.backgroundNode.updateLayout(size: self.backgroundNode.bounds.size, transition: transition)
 //        transition.updateFrame(node: self.imageNode, frame: containerFullScreenFrame)
 //        let arguments = TransformImageArguments(corners: ImageCorners(), imageSize: CGSize(width: 640.0, height: 640.0).aspectFilled(layout.size), boundingSize: layout.size, intrinsicInsets: UIEdgeInsets())
 //        let apply = self.imageNode.asyncLayout()(arguments)
