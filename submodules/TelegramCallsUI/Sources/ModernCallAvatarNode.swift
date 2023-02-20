@@ -7,7 +7,7 @@ import AvatarNode
 //import MediaPlayer
 import TelegramPresentationData
 
-private let avatarFont = avatarPlaceholderFont(size: 42.0)
+private let avatarFont = avatarPlaceholderFont(size: 52.0)
 
 final class ModernCallAvatarNode: ASDisplayNode {
     
@@ -16,7 +16,6 @@ final class ModernCallAvatarNode: ASDisplayNode {
     override init() {
         self.avatarNode = AvatarNode(font: avatarFont)
         super.init()
-        self.backgroundColor = .red
         self.addSubnode(self.avatarNode)
     }
     

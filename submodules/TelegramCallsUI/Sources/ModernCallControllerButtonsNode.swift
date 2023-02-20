@@ -63,7 +63,7 @@ private enum ButtonDescription: Equatable {
 }
 
 final class ModernCallControllerButtonsNode: ASDisplayNode {
-    private var buttonNodes: [ButtonDescription.Key: CallControllerButtonItemNode] = [:]
+    private var buttonNodes: [ButtonDescription.Key: ModernCallControllerButtonItemNode] = [:]
     
     private var mode: CallControllerButtonsMode?
     
@@ -123,8 +123,8 @@ final class ModernCallControllerButtonsNode: ASDisplayNode {
             }
         }
         
-        let minSmallButtonSideInset: CGFloat = width > 320.0 ? 34.0 : 16.0
-        let maxSmallButtonSpacing: CGFloat = 34.0
+        let minSmallButtonSideInset: CGFloat = width > 320.0 ? 30.0 : 16.0
+        let maxSmallButtonSpacing: CGFloat = 36.0
         let smallButtonSize: CGFloat = 56.0
         let topBottomSpacing: CGFloat = 84.0
         
@@ -273,24 +273,10 @@ final class ModernCallControllerButtonsNode: ASDisplayNode {
             
             var topButtons: [ButtonDescription] = []
             
-            if videoState.hasVideo {
-                topButtons.append(.enableCamera(isActive: isCameraActive || isScreencastActive, isEnabled: isCameraEnabled, isLoading: isCameraInitializing, isScreencast: isScreencastActive))
-                if hasAudioRouteMenu {
-                    topButtons.append(.soundOutput(soundOutput))
-                } else {
-                    topButtons.append(.mute(isMuted))
-                }
-                if !isScreencastActive {
-                    topButtons.append(.switchCamera(isCameraActive && !isCameraInitializing))
-                }
-                topButtons.append(.end(.end))
-                
-
+            if videoState.isCameraActive {
+                topButtons.append(.switchCamera(!isCameraInitializing))
             } else {
-                topButtons.append(.enableCamera(isActive: isCameraActive || isScreencastActive, isEnabled: isCameraEnabled, isLoading: isCameraInitializing, isScreencast: isScreencastActive))
-                topButtons.append(.mute(self.isMuted))
                 topButtons.append(.soundOutput(soundOutput))
-                topButtons.append(.end(.end))
                 
 //                let topButtonsContentWidth = CGFloat(topButtons.count) * smallButtonSize
 //                let topButtonsAvailableSpacingWidth = width - topButtonsContentWidth - minSmallButtonSideInset * 2.0
@@ -316,6 +302,9 @@ final class ModernCallControllerButtonsNode: ASDisplayNode {
 //
 //                height = largeButtonSize + topBottomSpacing + largeButtonSize + max(bottomInset + 32.0, 46.0)
             }
+            topButtons.append(.enableCamera(isActive: isCameraActive || isScreencastActive, isEnabled: isCameraEnabled, isLoading: isCameraInitializing, isScreencast: isScreencastActive))
+            topButtons.append(.mute(self.isMuted))
+            topButtons.append(.end(.end))
             
             let topButtonsContentWidth = CGFloat(topButtons.count) * smallButtonSize
             let topButtonsAvailableSpacingWidth = width - topButtonsContentWidth - minSmallButtonSideInset * 2.0
@@ -327,7 +316,7 @@ final class ModernCallControllerButtonsNode: ASDisplayNode {
                 topButtonsLeftOffset += smallButtonSize + topButtonsSpacing
             }
             
-            height = smallButtonSize + max(bottomInset + 19.0, 46.0)
+            height = smallButtonSize + max(bottomInset + 52.0, 46.0) // TODO: timur small sizes
         }
         
         let delayIncrement = 0.015
@@ -336,32 +325,32 @@ final class ModernCallControllerButtonsNode: ASDisplayNode {
             validKeys.append(button.button.key)
             var buttonTransition = transition
             var animateButtonIn = false
-            let buttonNode: CallControllerButtonItemNode
+            let buttonNode: ModernCallControllerButtonItemNode
             if let current = self.buttonNodes[button.button.key] {
                 buttonNode = current
             } else {
-                buttonNode = CallControllerButtonItemNode()
+                buttonNode = ModernCallControllerButtonItemNode(largeButtonSize: smallButtonSize)
                 self.buttonNodes[button.button.key] = buttonNode
                 self.addSubnode(buttonNode)
                 buttonNode.addTarget(self, action: #selector(self.buttonPressed(_:)), forControlEvents: .touchUpInside)
                 buttonTransition = .immediate
                 animateButtonIn = transition.isAnimated
             }
-            let buttonContent: CallControllerButtonItemNode.Content
+            let buttonContent: ModernCallControllerButtonItemNode.Content
             let buttonText: String
             var buttonAccessibilityLabel = ""
             var buttonAccessibilityValue = ""
             var buttonAccessibilityTraits: UIAccessibilityTraits = [.button]
             switch button.button {
             case .accept:
-                buttonContent = CallControllerButtonItemNode.Content(
+                buttonContent = ModernCallControllerButtonItemNode.Content(
                     appearance: .color(.green),
                     image: .accept
                 )
                 buttonText = strings.Call_Accept
                 buttonAccessibilityLabel = buttonText
             case let .end(type):
-                buttonContent = CallControllerButtonItemNode.Content(
+                buttonContent = ModernCallControllerButtonItemNode.Content(
                     appearance: .color(.red),
                     image: type == .decline ? .end : .cross
                 )
@@ -379,13 +368,13 @@ final class ModernCallControllerButtonsNode: ASDisplayNode {
                     buttonAccessibilityLabel = strings.Call_End
                 }
             case let .enableCamera(isActivated, isEnabled, isInitializing, isScreencastActive):
-                buttonContent = CallControllerButtonItemNode.Content(
+                buttonContent = ModernCallControllerButtonItemNode.Content(
                     appearance: .blurred(isFilled: isActivated),
                     image: isScreencastActive ? .screencast : .camera,
                     isEnabled: isEnabled,
                     hasProgress: isInitializing
                 )
-                buttonText = strings.Call_Camera
+                buttonText = "video" // TODO: timur
                 buttonAccessibilityLabel = buttonText
                 if !isEnabled {
                     buttonAccessibilityTraits.insert(.notEnabled)
@@ -394,7 +383,7 @@ final class ModernCallControllerButtonsNode: ASDisplayNode {
                     buttonAccessibilityTraits.insert(.selected)
                 }
             case let .switchCamera(isEnabled):
-                buttonContent = CallControllerButtonItemNode.Content(
+                buttonContent = ModernCallControllerButtonItemNode.Content(
                     appearance: .blurred(isFilled: false),
                     image: .flipCamera,
                     isEnabled: isEnabled
@@ -405,7 +394,7 @@ final class ModernCallControllerButtonsNode: ASDisplayNode {
                     buttonAccessibilityTraits.insert(.notEnabled)
                 }
             case let .soundOutput(value):
-                let image: CallControllerButtonItemNode.Content.Image
+                let image: ModernCallControllerButtonItemNode.Content.Image
                 var isFilled = false
                 var title: String = strings.Call_Speaker
                 switch value {
@@ -435,7 +424,7 @@ final class ModernCallControllerButtonsNode: ASDisplayNode {
                     title = strings.Call_Audio
                     buttonAccessibilityValue = strings.Call_AudioRouteHeadphones
                 }
-                buttonContent = CallControllerButtonItemNode.Content(
+                buttonContent = ModernCallControllerButtonItemNode.Content(
                     appearance: .blurred(isFilled: isFilled),
                     image: image
                 )
@@ -445,7 +434,7 @@ final class ModernCallControllerButtonsNode: ASDisplayNode {
                     buttonAccessibilityTraits.insert(.selected)
                 }
             case let .mute(isMuted):
-                buttonContent = CallControllerButtonItemNode.Content(
+                buttonContent = ModernCallControllerButtonItemNode.Content(
                     appearance: .blurred(isFilled: isMuted),
                     image: .mute
                 )
@@ -508,7 +497,7 @@ final class ModernCallControllerButtonsNode: ASDisplayNode {
         return height
     }
     
-    @objc func buttonPressed(_ button: CallControllerButtonItemNode) {
+    @objc func buttonPressed(_ button: ModernCallControllerButtonItemNode) {
         for (key, listButton) in self.buttonNodes {
             if button === listButton {
                 switch key {
