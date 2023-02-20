@@ -373,7 +373,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     private let backgroundNode: ModernCallBackgroundNode
     private let avatarNode: ModernCallAvatarNode
 //    private let imageNode: TransformImageNode
-    private let dimNode: ASImageNode
+//    private let dimNode: ASImageNode
     
     private var candidateIncomingVideoNodeValue: ModernCallVideoNode?
     private var incomingVideoNodeValue: ModernCallVideoNode?
@@ -493,10 +493,10 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         
         self.avatarNode = ModernCallAvatarNode()
         
-        self.dimNode = ASImageNode()
-        self.dimNode.contentMode = .scaleToFill
-        self.dimNode.isUserInteractionEnabled = false
-        self.dimNode.backgroundColor = UIColor(white: 0.0, alpha: 0.3)
+//        self.dimNode = ASImageNode()
+//        self.dimNode.contentMode = .scaleToFill
+//        self.dimNode.isUserInteractionEnabled = false
+//        self.dimNode.backgroundColor = UIColor(white: 0.0, alpha: 0.3)
         
         self.backButtonArrowNode = ASImageNode()
         self.backButtonArrowNode.displayWithoutProcessing = true
@@ -541,11 +541,11 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //        self.containerNode.addSubnode(self.imageNode)
         self.containerNode.addSubnode(self.backgroundNode)
         self.containerNode.addSubnode(self.avatarNode)
-//        self.containerNode.addSubnode(self.videoContainerNode)
+        self.containerNode.addSubnode(self.videoContainerNode)
 //        self.containerNode.addSubnode(self.dimNode)
         self.containerNode.addSubnode(self.statusNode)
         self.containerNode.addSubnode(self.buttonsNode)
-//        self.containerNode.addSubnode(self.toastNode)
+        self.containerNode.addSubnode(self.toastNode)
         self.containerNode.addSubnode(self.keyButtonNode)
         self.containerNode.addSubnode(self.backButtonArrowNode)
         self.containerNode.addSubnode(self.backButtonNode)
@@ -802,7 +802,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             let context = sharedContext.makeTempAccountContext(account: account)
             self.avatarNode.avatarNode.setPeer(context: context, theme: presentationData.theme, peer: EnginePeer(peer))
             
-//            if let peerReference = PeerReference(peer), !peer.profileImageRepresentations.isEmpty {
+//            if !peer.profileImageRepresentations.isEmpty {
 ////                let representations: [ImageRepresentationWithReference] = peer.profileImageRepresentations.map({ ImageRepresentationWithReference(representation: $0, reference: .avatar(peer: peerReference, resource: $0.resource)) })
 ////                self.imageNode.setSignal(chatAvatarGalleryPhoto(account: self.account, representations: representations, immediateThumbnailData: nil, autoFetchFullSize: true))
 //                self.dimNode.isHidden = false
@@ -1246,20 +1246,20 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             visible = false
         }
         
-        let currentVisible = self.dimNode.image == nil
-        if visible != currentVisible {
-            let color = visible ? UIColor(rgb: 0x000000, alpha: 0.3) : UIColor.clear
-            let image: UIImage? = visible ? nil : generateGradientImage(size: CGSize(width: 1.0, height: 640.0), colors: [UIColor.black.withAlphaComponent(0.3), UIColor.clear, UIColor.clear, UIColor.black.withAlphaComponent(0.3)], locations: [0.0, 0.22, 0.7, 1.0])
-            if case let .animated(duration, _) = transition {
-                UIView.transition(with: self.dimNode.view, duration: duration, options: .transitionCrossDissolve, animations: {
-                    self.dimNode.backgroundColor = color
-                    self.dimNode.image = image
-                }, completion: nil)
-            } else {
-                self.dimNode.backgroundColor = color
-                self.dimNode.image = image
-            }
-        }
+//        let currentVisible = self.dimNode.image == nil
+//        if visible != currentVisible {
+//            let color = visible ? UIColor(rgb: 0x000000, alpha: 0.3) : UIColor.clear
+//            let image: UIImage? = visible ? nil : generateGradientImage(size: CGSize(width: 1.0, height: 640.0), colors: [UIColor.black.withAlphaComponent(0.3), UIColor.clear, UIColor.clear, UIColor.black.withAlphaComponent(0.3)], locations: [0.0, 0.22, 0.7, 1.0])
+//            if case let .animated(duration, _) = transition {
+//                UIView.transition(with: self.dimNode.view, duration: duration, options: .transitionCrossDissolve, animations: {
+//                    self.dimNode.backgroundColor = color
+//                    self.dimNode.image = image
+//                }, completion: nil)
+//            } else {
+//                self.dimNode.backgroundColor = color
+//                self.dimNode.image = image
+//            }
+//        }
         self.statusNode.setVisible(visible || self.keyPreviewNode != nil, transition: transition)
     }
     
@@ -1589,8 +1589,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         transition.updateFrame(node: self.videoContainerNode, frame: containerFullScreenFrame)
         self.videoContainerNode.update(size: containerFullScreenFrame.size, transition: transition)
         
-        transition.updateAlpha(node: self.dimNode, alpha: pinchTransitionAlpha)
-        transition.updateFrame(node: self.dimNode, frame: containerFullScreenFrame)
+//        transition.updateAlpha(node: self.dimNode, alpha: pinchTransitionAlpha)
+//        transition.updateFrame(node: self.dimNode, frame: containerFullScreenFrame)
         
         if let keyPreviewNode = self.keyPreviewNode {
             transition.updateFrame(node: keyPreviewNode, frame: containerFullScreenFrame)
