@@ -372,7 +372,6 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     
     private let backgroundNode: ModernCallBackgroundNode
     private let avatarNode: ModernCallAvatarNode
-    private let infoNode: ModernCallInfoNode
 //    private let imageNode: TransformImageNode
     private let dimNode: ASImageNode
     
@@ -403,7 +402,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     private var outgoingVideoNodeCorner: VideoNodeCorner = .bottomRight
     private let backButtonArrowNode: ASImageNode
     private let backButtonNode: HighlightableButtonNode
-    private let statusNode: CallControllerStatusNode
+    private let statusNode: ModernCallControllerStatusNode
     private let toastNode: CallControllerToastContainerNode
     private let buttonsNode: ModernCallControllerButtonsNode
     private var keyPreviewNode: CallControllerKeyPreviewNode?
@@ -494,8 +493,6 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         
         self.avatarNode = ModernCallAvatarNode()
         
-        self.infoNode = ModernCallInfoNode()
-        
         self.dimNode = ASImageNode()
         self.dimNode.contentMode = .scaleToFill
         self.dimNode.isUserInteractionEnabled = false
@@ -507,7 +504,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         self.backButtonArrowNode.image = NavigationBarTheme.generateBackArrowImage(color: .white)
         self.backButtonNode = HighlightableButtonNode()
         
-        self.statusNode = CallControllerStatusNode()
+        self.statusNode = ModernCallControllerStatusNode()
         
         self.buttonsNode = ModernCallControllerButtonsNode(strings: self.presentationData.strings)
         self.toastNode = CallControllerToastContainerNode(strings: self.presentationData.strings)
@@ -544,10 +541,9 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //        self.containerNode.addSubnode(self.imageNode)
         self.containerNode.addSubnode(self.backgroundNode)
         self.containerNode.addSubnode(self.avatarNode)
-        self.containerNode.addSubnode(self.infoNode)
 //        self.containerNode.addSubnode(self.videoContainerNode)
 //        self.containerNode.addSubnode(self.dimNode)
-//        self.containerNode.addSubnode(self.statusNode)
+        self.containerNode.addSubnode(self.statusNode)
         self.containerNode.addSubnode(self.buttonsNode)
 //        self.containerNode.addSubnode(self.toastNode)
         self.containerNode.addSubnode(self.keyButtonNode)
@@ -1621,28 +1617,25 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         transition.updateAlpha(node: self.backButtonNode, alpha: overlayAlpha)
         transition.updateAlpha(node: self.toastNode, alpha: toastAlpha)
         
-        var statusOffset: CGFloat
-        if layout.metrics.widthClass == .regular && layout.metrics.heightClass == .regular {
-            if layout.size.height.isEqual(to: 1366.0) {
-                statusOffset = 160.0
-            } else {
-                statusOffset = 120.0
-            }
-        } else {
-            if layout.size.height.isEqual(to: 736.0) {
-                statusOffset = 80.0
-            } else if layout.size.width.isEqual(to: 320.0) {
-                statusOffset = 60.0
-            } else {
-                statusOffset = 64.0
-            }
-        }
-        
-        statusOffset += layout.safeInsets.top
-        
-        let statusHeight = self.statusNode.updateLayout(constrainedWidth: layout.size.width, transition: transition)
-        transition.updateFrame(node: self.statusNode, frame: CGRect(origin: CGPoint(x: 0.0, y: statusOffset), size: CGSize(width: layout.size.width, height: statusHeight)))
-        transition.updateAlpha(node: self.statusNode, alpha: overlayAlpha)
+        // TODO: timur
+//        var statusOffset: CGFloat
+//        if layout.metrics.widthClass == .regular && layout.metrics.heightClass == .regular {
+//            if layout.size.height.isEqual(to: 1366.0) {
+//                statusOffset = 160.0
+//            } else {
+//                statusOffset = 120.0
+//            }
+//        } else {
+//            if layout.size.height.isEqual(to: 736.0) {
+//                statusOffset = 80.0
+//            } else if layout.size.width.isEqual(to: 320.0) {
+//                statusOffset = 60.0
+//            } else {
+//                statusOffset = 64.0
+//            }
+//        }
+//
+//        statusOffset += layout.safeInsets.top
         
         transition.updateFrame(node: self.toastNode, frame: CGRect(origin: CGPoint(x: 0.0, y: toastOriginY), size: CGSize(width: layout.size.width, height: toastHeight)))
         transition.updateFrame(node: self.buttonsNode, frame: CGRect(origin: CGPoint(x: 0.0, y: buttonsOriginY), size: CGSize(width: layout.size.width, height: buttonsHeight)))
@@ -1653,7 +1646,9 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         transition.updateFrame(node: self.avatarNode, frame: CGRect(x: layout.size.width / 2.0 - avatarSize.width / 2.0, y: avatarY, width: avatarSize.width, height: avatarSize.height)) // + 18 TODO: timur devices
         self.avatarNode.updateLayout(size: avatarSize, transition: transition)
         
-        transition.updateFrame(node: self.infoNode, frame: CGRect(x: 0, y: avatarY + avatarSize.height, width: layout.size.width, height: 60))
+        let statusHeight = self.statusNode.updateLayout(constrainedWidth: layout.size.width, transition: transition)
+        transition.updateFrame(node: self.statusNode, frame: CGRect(x: 0.0, y: avatarY + avatarSize.height, width: layout.size.width, height: statusHeight))
+        transition.updateAlpha(node: self.statusNode, alpha: overlayAlpha)
         
         let fullscreenVideoFrame = containerFullScreenFrame
         let previewVideoFrame = self.calculatePreviewVideoRect(layout: layout, navigationHeight: navigationBarHeight)
