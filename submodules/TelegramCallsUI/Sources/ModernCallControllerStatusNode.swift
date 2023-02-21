@@ -7,7 +7,7 @@ import SwiftSignalKit
 private let compactNameFont = Font.regular(28.0)
 private let regularNameFont = Font.regular(36.0)
 
-private let compactStatusFont = Font.regular(18.0)
+private let compactStatusFont = Font.regular(16.0)
 private let regularStatusFont = Font.regular(18.0)
 
 final class ModernCallControllerStatusNode: ASDisplayNode {

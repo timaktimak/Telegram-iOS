@@ -1641,13 +1641,13 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         transition.updateFrame(node: self.buttonsNode, frame: CGRect(origin: CGPoint(x: 0.0, y: buttonsOriginY), size: CGSize(width: layout.size.width, height: buttonsHeight)))
         transition.updateAlpha(node: self.buttonsNode, alpha: overlayAlpha)
         
-        let avatarY = navigationBarHeight + 130
+        let avatarY = navigationBarHeight + 120
         let avatarSize = CGSize(width: 136, height: 136) // + 18 TODO: timur
         transition.updateFrame(node: self.avatarNode, frame: CGRect(x: layout.size.width / 2.0 - avatarSize.width / 2.0, y: avatarY, width: avatarSize.width, height: avatarSize.height)) // + 18 TODO: timur devices
         self.avatarNode.updateLayout(size: avatarSize, transition: transition)
         
         let statusHeight = self.statusNode.updateLayout(constrainedWidth: layout.size.width, transition: transition)
-        transition.updateFrame(node: self.statusNode, frame: CGRect(x: 0.0, y: avatarY + avatarSize.height, width: layout.size.width, height: statusHeight))
+        transition.updateFrame(node: self.statusNode, frame: CGRect(x: 0.0, y: avatarY + avatarSize.height + 40, width: layout.size.width, height: statusHeight))
         transition.updateAlpha(node: self.statusNode, alpha: overlayAlpha)
         
         let fullscreenVideoFrame = containerFullScreenFrame
