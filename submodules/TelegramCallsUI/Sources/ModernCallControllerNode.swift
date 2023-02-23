@@ -406,6 +406,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     private let toastNode: CallControllerToastContainerNode
     private let buttonsNode: ModernCallControllerButtonsNode
     private var keyPreviewNode: CallControllerKeyPreviewNode?
+    private var keyPreview: ModernCallControllerKeyPreviewNode?
     
     private var debugNode: CallDebugNode?
     
@@ -1743,9 +1744,11 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             self.animationForExpandedVideoSnapshotView = nil
         }
         
-        let keyTextSize = self.keyButtonNode.frame.size
-        transition.updateFrame(node: self.keyButtonNode, frame: CGRect(origin: CGPoint(x: layout.size.width - keyTextSize.width - 8.0, y: topOriginY + 8.0), size: keyTextSize))
-        transition.updateAlpha(node: self.keyButtonNode, alpha: overlayAlpha)
+//        let keyTextSize = self.keyButtonNode.frame.size
+        if keyPreview == nil {
+            transition.updateFrame(node: self.keyButtonNode, frame: frameForKeyButtonNode())
+            transition.updateAlpha(node: self.keyButtonNode, alpha: overlayAlpha)
+        }
         
         if let debugNode = self.debugNode {
             transition.updateFrame(node: debugNode, frame: CGRect(origin: CGPoint(), size: layout.size))
@@ -1789,27 +1792,108 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         }
     }
     
+    private func frameForKeyButtonNode() -> CGRect {
+        var isUIHidden = self.isUIHidden
+        switch self.callState?.state {
+        case .terminated, .terminating:
+            isUIHidden = false
+        default:
+            break
+        }
+        
+        var uiDisplayTransition: CGFloat = isUIHidden ? 0.0 : 1.0
+        let pipTransitionAlpha: CGFloat = 1.0 - self.pictureInPictureTransitionFraction
+        uiDisplayTransition *= pipTransitionAlpha
+        let keyTextSize = self.keyButtonNode.frame.size
+        
+        let navigationOffset: CGFloat = max(20.0, self.validLayout!.0.safeInsets.top)
+        let topOriginY = interpolate(from: -20.0, to: navigationOffset, value: uiDisplayTransition)
+        
+        return CGRect(origin: CGPoint(x: self.validLayout!.0.size.width - keyTextSize.width - 8.0, y: topOriginY + 8.0), size: keyTextSize)
+    }
+    
+//    private func keyPreviewPoint() -> CGPoint {
+//        return CGPoint(x: validLayout!.size.width - 45, y: 132)
+//    }
+    
     @objc func keyPressed() {
-        if self.keyPreviewNode == nil, let keyText = self.keyTextData?.1, let peer = self.peer {
-            let keyPreviewNode = CallControllerKeyPreviewNode(keyText: keyText, infoText: self.presentationData.strings.Call_EmojiDescription(EnginePeer(peer).compactDisplayTitle).string.replacingOccurrences(of: "%%", with: "%"), dismiss: { [weak self] in
-                if let _ = self?.keyPreviewNode {
-                    self?.backPressed()
-                }
+        if self.keyPreview == nil {//}, let keyText = self.keyTextData?.1 {//}, let peer = self.peer {
+            let keyPreview = ModernCallControllerKeyPreviewNode(title: "This call is end-to-end encrypted", subtitle: "If the emoji on Emma's screen are the same, this call is 100% secure.", ok: "OK", isDark: false, dismiss: { [weak self] in
+                self?.dismiss()
             })
             
-            self.containerNode.insertSubnode(keyPreviewNode, belowSubnode: self.statusNode)
-            self.keyPreviewNode = keyPreviewNode
+            self.containerNode.insertSubnode(keyPreview, belowSubnode: self.keyButtonNode)
+            self.keyButtonNode.isUserInteractionEnabled = false
+            self.keyPreview = keyPreview
             
             if let (validLayout, _) = self.validLayout {
-                keyPreviewNode.updateLayout(size: validLayout.size, transition: .immediate)
+                keyPreview.anchorPoint = CGPoint(x: 1, y: 0)
                 
-                self.keyButtonNode.isHidden = true
-                keyPreviewNode.animateIn(from: self.keyButtonNode.frame, fromNode: self.keyButtonNode)
+                ContainedViewLayoutTransition.immediate.updateFrame(node: keyPreview, frame: CGRect(x: 45, y: 132, width: validLayout.size.width - 90, height: 225))
+                ContainedViewLayoutTransition.immediate.updateTransformScale(node: keyPreview, scale: 0.1)
+                ContainedViewLayoutTransition.immediate.updateAlpha(node: keyPreview, alpha: 0.1)
+                
+                
+                let t = ContainedViewLayoutTransition.animated(duration: 0.6, curve: .spring)
+                keyPreview.updateLayout(size: CGSize(width: validLayout.size.width - 90, height: 225))
+                
+                t.updateTransformScale(node: keyPreview, scale: 1)
+                t.updateAlpha(node: keyPreview, alpha: 1)
+                
+                
+                let t2 = ContainedViewLayoutTransition.animated(duration: 0.4, curve: .easeInOut)
+                t2.updateAlpha(node: avatarNode, alpha: 0)
+                t2.updateTransformScale(node: avatarNode, scale: 0.5)
+                
+//                keyPreviewNode.updateLayout(size: validLayout.size, transition: .immediate)
+//                keyPreviewNode.animateIn(from: self.keyButtonNode.frame, fromNode: self.keyButtonNode)
+                
+                let t3 = ContainedViewLayoutTransition.animated(duration: 0.4, curve: .linear)
+                t3.updatePosition(node: self.keyButtonNode, position: CGPoint(x: validLayout.size.width / 2, y: 132 + 20 + self.keyButtonNode.bounds.size.height / 2))
             }
-            
-            self.updateDimVisibility()
         }
     }
+    
+    private func dismiss() {
+        if let keyPreview = self.keyPreview { // TODO: timur reversable?
+            let t = ContainedViewLayoutTransition.animated(duration: 0.6, curve: .spring)
+            t.updateAlpha(node: keyPreview, alpha: 0, beginWithCurrentState: true)
+            t.updateTransformScale(node: keyPreview, scale: 0.1, beginWithCurrentState: true, completion: { [weak self] _ in
+                keyPreview.removeFromSupernode()
+                self?.keyPreview = nil
+                self?.keyButtonNode.isUserInteractionEnabled = true
+            })
+            
+            let t2 = ContainedViewLayoutTransition.animated(duration: 0.4, curve: .easeInOut)
+            t2.updateAlpha(node: self.avatarNode, alpha: 1, beginWithCurrentState: true)
+            t2.updateTransformScale(node: self.avatarNode, scale: 1, beginWithCurrentState: true)
+            
+            let t3 = ContainedViewLayoutTransition.animated(duration: 0.4, curve: .linear)
+            t3.updateFrame(node: self.keyButtonNode, frame: frameForKeyButtonNode())
+        }
+    }
+    
+//    @objc func keyPressed() {
+//        if self.keyPreviewNode == nil, let keyText = self.keyTextData?.1, let peer = self.peer {
+//            let keyPreviewNode = CallControllerKeyPreviewNode(keyText: keyText, infoText: self.presentationData.strings.Call_EmojiDescription(EnginePeer(peer).compactDisplayTitle).string.replacingOccurrences(of: "%%", with: "%"), dismiss: { [weak self] in
+//                if let _ = self?.keyPreviewNode {
+//                    self?.backPressed()
+//                }
+//            })
+//
+//            self.containerNode.insertSubnode(keyPreviewNode, belowSubnode: self.statusNode)
+//            self.keyPreviewNode = keyPreviewNode
+//
+//            if let (validLayout, _) = self.validLayout {
+//                keyPreviewNode.updateLayout(size: validLayout.size, transition: .immediate)
+//
+//                self.keyButtonNode.isHidden = true
+//                keyPreviewNode.animateIn(from: self.keyButtonNode.frame, fromNode: self.keyButtonNode)
+//            }
+//
+//            self.updateDimVisibility()
+//        }
+//    }
     
     @objc func backPressed() {
         if let keyPreviewNode = self.keyPreviewNode {
