@@ -10,20 +10,77 @@ private let regularNameFont = Font.regular(36.0)
 private let compactStatusFont = Font.regular(16.0)
 private let regularStatusFont = Font.regular(18.0)
 
+private final class ModernCallActivityNode: ASDisplayNode {
+    
+    let circles: [ASDisplayNode]
+    
+    override init() {
+        circles = [
+            ASDisplayNode(),
+            ASDisplayNode(),
+            ASDisplayNode()
+        ]
+        super.init()
+    }
+    
+    override func didLoad() {
+        super.didLoad()
+        for (i, circle) in circles.enumerated() {
+            circle.backgroundColor = UIColor.white
+            circle.cornerRadius = 2
+            circle.frame = CGRect(x: 0, y: 0, width: 4, height: 4)
+            addSubnode(circle)
+            
+            circle.frame.origin.x += CGFloat(i * 6)
+        }
+    }
+}
+
+enum ModernCallStaticStatusType: Equatable {
+    case loading, callEnded
+}
+
+enum ModernCallStatus: Equatable {
+    case text(string: String, type: ModernCallStaticStatusType)
+    case timer((String, Bool) -> String, Double)
+    
+    static func ==(lhs: ModernCallStatus, rhs: ModernCallStatus) -> Bool {
+        switch lhs {
+            case let .text(text, type):
+                if case .text(text, type) = rhs {
+                    return true
+                } else {
+                    return false
+                }
+            case let .timer(_, referenceTime):
+                if case .timer(_, referenceTime) = rhs {
+                    return true
+                } else {
+                    return false
+                }
+        }
+    }
+}
+
 final class ModernCallControllerStatusNode: ASDisplayNode {
     private let titleNode: TextNode
     private let statusContainerNode: ASDisplayNode
     private let statusNode: TextNode
     private let statusMeasureNode: TextNode
     private let receptionNode: ModernCallControllerReceptionNode
-    private let logoNode: ASImageNode
+    private let callEndedNode: ASImageNode
     
     private let titleActivateAreaNode: AccessibilityAreaNode
     private let statusActivateAreaNode: AccessibilityAreaNode
     
+    private let activityNode: ModernCallActivityNode
+    
+    
+    // Call Ended меняет title а не статус
+    
     var title: String = ""
     var subtitle: String = ""
-    var status: CallControllerStatusValue = .text(string: "", displayLogo: false) {
+    var status: ModernCallStatus? = nil {
         didSet {
             if self.status != oldValue {
                 self.statusTimer?.invalidate()
@@ -31,13 +88,29 @@ final class ModernCallControllerStatusNode: ASDisplayNode {
                 if let snapshotView = self.statusContainerNode.view.snapshotView(afterScreenUpdates: false) {
                     snapshotView.frame = self.statusContainerNode.frame
                     self.view.insertSubview(snapshotView, belowSubview: self.statusContainerNode.view)
-                    
+
                     snapshotView.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.3, removeOnCompletion: false, completion: { [weak snapshotView] _ in
                         snapshotView?.removeFromSuperview()
+                        
+                        if !self.activityNode.isHidden {
+                            for (i, circle) in self.activityNode.circles.enumerated() {
+                                circle.layer.removeAllAnimations()
+                                let animation = CABasicAnimation(keyPath: "transform.scale")
+                                animation.fromValue = 0.8
+                                animation.toValue = 1.4
+                                animation.duration = 0.6
+                                animation.autoreverses = true
+                                animation.isRemovedOnCompletion = false
+                                animation.repeatCount = Float.greatestFiniteMagnitude
+                                animation.beginTime = CACurrentMediaTime() + CFTimeInterval(i) * 0.15
+                                circle.layer.add(animation, forKey: "activity")
+                            }
+                        }
+                        
                     })
                     snapshotView.layer.animateScale(from: 1.0, to: 0.3, duration: 0.3, removeOnCompletion: false)
                     snapshotView.layer.animatePosition(from: CGPoint(), to: CGPoint(x: 0.0, y: snapshotView.frame.height / 2.0), duration: 0.3, delay: 0.0, removeOnCompletion: false, additive: true)
-                    
+
                     self.statusContainerNode.layer.animateScale(from: 0.3, to: 1.0, duration: 0.3)
                     self.statusContainerNode.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.3)
                     self.statusContainerNode.layer.animatePosition(from: CGPoint(x: 0.0, y: -snapshotView.frame.height / 2.0), to: CGPoint(), duration: 0.3, delay: 0.0, additive: true)
@@ -95,15 +168,17 @@ final class ModernCallControllerStatusNode: ASDisplayNode {
         self.receptionNode = ModernCallControllerReceptionNode()
         self.receptionNode.alpha = 0.0
         
-        self.logoNode = ASImageNode()
-        self.logoNode.image = generateTintedImage(image: UIImage(bundleImageName: "Call/CallTitleLogo"), color: .white)
-        self.logoNode.isHidden = true
+        self.callEndedNode = ASImageNode()
+        self.callEndedNode.image = generateTintedImage(image: UIImage(bundleImageName: "Call/CallEnded"), color: .white)
+        self.callEndedNode.isHidden = true
         
         self.titleActivateAreaNode = AccessibilityAreaNode()
         self.titleActivateAreaNode.accessibilityTraits = .staticText
         
         self.statusActivateAreaNode = AccessibilityAreaNode()
         self.statusActivateAreaNode.accessibilityTraits = [.staticText, .updatesFrequently]
+        
+        self.activityNode = ModernCallActivityNode()
         
         super.init()
         
@@ -113,7 +188,8 @@ final class ModernCallControllerStatusNode: ASDisplayNode {
         self.addSubnode(self.statusContainerNode)
         self.statusContainerNode.addSubnode(self.statusNode)
         self.statusContainerNode.addSubnode(self.receptionNode)
-        self.statusContainerNode.addSubnode(self.logoNode)
+        self.statusContainerNode.addSubnode(self.callEndedNode)
+        self.statusContainerNode.addSubnode(self.activityNode)
         
         self.addSubnode(self.titleActivateAreaNode)
         self.addSubnode(self.statusActivateAreaNode)
@@ -145,15 +221,15 @@ final class ModernCallControllerStatusNode: ASDisplayNode {
         var statusOffset: CGFloat = 0.0
         let statusText: String
         let statusMeasureText: String
-        var statusDisplayLogo: Bool = false
+        var staticType: ModernCallStaticStatusType?
         switch self.status {
-        case let .text(text, displayLogo):
+        case nil:
+            statusText = ""
+            statusMeasureText = ""
+        case let .text(text, type):
             statusText = text
             statusMeasureText = text
-            statusDisplayLogo = displayLogo
-            if displayLogo {
-                statusOffset += 10.0
-            }
+            staticType = type
         case let .timer(format, referenceTime):
             let duration = Int32(CFAbsoluteTimeGetCurrent() - referenceTime)
             let durationString: String
@@ -187,12 +263,22 @@ final class ModernCallControllerStatusNode: ASDisplayNode {
         self.titleNode.frame = CGRect(origin: CGPoint(x: floor((constrainedWidth - titleLayout.size.width) / 2.0), y: 0.0), size: titleLayout.size)
         self.statusContainerNode.frame = CGRect(origin: CGPoint(x: 0.0, y: titleLayout.size.height + spacing), size: CGSize(width: constrainedWidth, height: statusLayout.size.height))
         self.statusNode.frame = CGRect(origin: CGPoint(x: floor((constrainedWidth - statusMeasureLayout.size.width) / 2.0) + statusOffset, y: 0.0), size: statusLayout.size)
+        self.activityNode.frame = CGRect(x: self.statusNode.frame.maxX + 4, y: self.statusNode.frame.origin.y + self.statusNode.frame.height / 2 - 4, width: 16, height: 8)
+        
+        let iconSize = CGSize(width: 20.0, height: 20.0)
+        
         self.receptionNode.frame = CGRect(origin: CGPoint(x: self.statusNode.frame.minX - receptionNodeSize.width, y: 9.0), size: receptionNodeSize)
-        self.logoNode.isHidden = !statusDisplayLogo
-        if let image = self.logoNode.image, let firstLineRect = statusMeasureLayout.linesRects().first {
-            let firstLineOffset = floor((statusMeasureLayout.size.width - firstLineRect.width) / 2.0)
-            self.logoNode.frame = CGRect(origin: CGPoint(x: self.statusNode.frame.minX + firstLineOffset - image.size.width - 7.0, y: 5.0), size: image.size)
-        }
+        self.callEndedNode.frame = CGRect(origin: CGPoint(x: self.statusNode.frame.minX - iconSize.width, y: self.statusNode.frame.origin.y + self.statusNode.frame.height / 2.0 - 20.0 / 2.0), size: CGSize(width: 20, height: 20))
+        
+        self.activityNode.isHidden = staticType != .loading
+        self.callEndedNode.isHidden = staticType != .callEnded
+        
+        
+//        self.logoNode.isHidden = !statusDisplayLogo
+//        if let image = self.logoNode.image, let firstLineRect = statusMeasureLayout.linesRects().first {
+//            let firstLineOffset = floor((statusMeasureLayout.size.width - firstLineRect.width) / 2.0)
+//            self.logoNode.frame = CGRect(origin: CGPoint(x: self.statusNode.frame.minX + firstLineOffset - image.size.width - 7.0, y: 5.0), size: image.size)
+//        }
         
         self.titleActivateAreaNode.frame = self.titleNode.frame
         self.statusActivateAreaNode.frame = self.statusContainerNode.frame

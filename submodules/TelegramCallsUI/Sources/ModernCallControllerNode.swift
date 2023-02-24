@@ -865,7 +865,6 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         
         self.callState = callState
         
-        let statusValue: CallControllerStatusValue
         var statusReception: Int32?
         
         switch callState.remoteVideoState {
@@ -1066,26 +1065,28 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             }
         }
                 
+        let statusValue: ModernCallStatus
+        
         switch callState.state {
             case .waiting, .connecting:
-                statusValue = .text(string: self.presentationData.strings.Call_StatusConnecting, displayLogo: false)
+            statusValue = .text(string: self.presentationData.strings.Call_StatusConnecting, type: .loading)
             case let .requesting(ringing):
                 if ringing {
-                    statusValue = .text(string: self.presentationData.strings.Call_StatusRinging, displayLogo: false)
+                    statusValue = .text(string: self.presentationData.strings.Call_StatusRinging, type: .loading)
                 } else {
-                    statusValue = .text(string: self.presentationData.strings.Call_StatusRequesting, displayLogo: false)
+                    statusValue = .text(string: self.presentationData.strings.Call_StatusRequesting, type: .loading)
                 }
             case .terminating:
-                statusValue = .text(string: self.presentationData.strings.Call_StatusEnded, displayLogo: false)
+                statusValue = .text(string: self.presentationData.strings.Call_StatusEnded, type: .loading)
             case let .terminated(_, reason, _):
                 if let reason = reason {
                     switch reason {
                         case let .ended(type):
                             switch type {
                                 case .busy:
-                                    statusValue = .text(string: self.presentationData.strings.Call_StatusBusy, displayLogo: false)
+                                    statusValue = .text(string: self.presentationData.strings.Call_StatusBusy, type: .callEnded)
                                 case .hungUp, .missed:
-                                    statusValue = .text(string: self.presentationData.strings.Call_StatusEnded, displayLogo: false)
+                                    statusValue = .text(string: self.presentationData.strings.Call_StatusEnded, type: .callEnded)
                             }
                         case let .error(error):
                             let text = self.presentationData.strings.Call_StatusFailed
@@ -1107,10 +1108,10 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                             default:
                                 break
                             }
-                            statusValue = .text(string: text, displayLogo: false)
+                        statusValue = .text(string: text, type: .callEnded)
                     }
                 } else {
-                    statusValue = .text(string: self.presentationData.strings.Call_StatusEnded, displayLogo: false)
+                    statusValue = .text(string: self.presentationData.strings.Call_StatusEnded, type: .callEnded)
                 }
             case .ringing:
                 var text: String
@@ -1122,7 +1123,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 if !self.statusNode.subtitle.isEmpty {
                     text += "\n\(self.statusNode.subtitle)"
                 }
-                statusValue = .text(string: text, displayLogo: false)
+                statusValue = .text(string: text, type: .loading)
             case .active(let timestamp, let reception, let keyVisualHash), .reconnecting(let timestamp, let reception, let keyVisualHash):
                 let strings = self.presentationData.strings
                 var isReconnecting = false
