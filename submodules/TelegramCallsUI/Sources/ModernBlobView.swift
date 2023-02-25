@@ -4,41 +4,39 @@ import AsyncDisplayKit
 import Display
 import LegacyComponents
 
-public final class VoiceBlobNode: ASDisplayNode {
+public final class ModernVoiceBlobNode: ASDisplayNode {
     public init(
         maxLevel: CGFloat,
-        smallBlobRange: VoiceBlobView.BlobRange,
-        mediumBlobRange: VoiceBlobView.BlobRange,
-        bigBlobRange: VoiceBlobView.BlobRange
+        mediumBlobRange: ModernVoiceBlobView.BlobRange,
+        bigBlobRange: ModernVoiceBlobView.BlobRange
     ) {
         super.init()
         
         self.setViewBlock({
-            return VoiceBlobView(frame: CGRect(), maxLevel: maxLevel, smallBlobRange: smallBlobRange, mediumBlobRange: mediumBlobRange, bigBlobRange: bigBlobRange)
+            return ModernVoiceBlobView(frame: CGRect(), maxLevel: maxLevel, mediumBlobRange: mediumBlobRange, bigBlobRange: bigBlobRange)
         })
     }
     
     public func startAnimating(immediately: Bool = false) {
-        (self.view as? VoiceBlobView)?.startAnimating(immediately: immediately)
+        (self.view as? ModernVoiceBlobView)?.startAnimating(immediately: immediately)
     }
     
     public func stopAnimating(duration: Double = 0.15) {
-        (self.view as? VoiceBlobView)?.stopAnimating(duration: duration)
+        (self.view as? ModernVoiceBlobView)?.stopAnimating(duration: duration)
     }
     
     public func setColor(_ color: UIColor, animated: Bool = false, mediumAlpha: CGFloat = 0.3, bigAlpha: CGFloat = 0.15) {
-        (self.view as? VoiceBlobView)?.setColor(color, animated: animated, mediumAlpha: mediumAlpha, bigAlpha: bigAlpha)
+        (self.view as? ModernVoiceBlobView)?.setColor(color, animated: animated, mediumAlpha: mediumAlpha, bigAlpha: bigAlpha)
     }
     
     public func updateLevel(_ level: CGFloat, immediately: Bool = false) {
-        (self.view as? VoiceBlobView)?.updateLevel(level, immediately: immediately)
+        (self.view as? ModernVoiceBlobView)?.updateLevel(level, immediately: immediately)
     }
 }
 
-public final class VoiceBlobView: UIView, TGModernConversationInputMicButtonDecoration {
-    private let smallBlob: BlobNode
-    private let mediumBlob: BlobNode
-    private let bigBlob: BlobNode
+public final class ModernVoiceBlobView: UIView, TGModernConversationInputMicButtonDecoration {
+    private let mediumBlob: ModernBlobNode
+    private let bigBlob: ModernBlobNode
     
     private let maxLevel: CGFloat
     
@@ -59,24 +57,12 @@ public final class VoiceBlobView: UIView, TGModernConversationInputMicButtonDeco
     public init(
         frame: CGRect,
         maxLevel: CGFloat,
-        smallBlobRange: BlobRange,
         mediumBlobRange: BlobRange,
         bigBlobRange: BlobRange
     ) {
         self.maxLevel = maxLevel
         
-        self.smallBlob = BlobNode(
-            pointsCount: 8,
-            minRandomness: 0.1,
-            maxRandomness: 0.5,
-            minSpeed: 0.2,
-            maxSpeed: 0.6,
-            minScale: smallBlobRange.min,
-            maxScale: smallBlobRange.max,
-            scaleSpeed: 0.2,
-            isCircle: true
-        )
-        self.mediumBlob = BlobNode(
+        self.mediumBlob = ModernBlobNode(
             pointsCount: 8,
             minRandomness: 1,
             maxRandomness: 1,
@@ -87,7 +73,7 @@ public final class VoiceBlobView: UIView, TGModernConversationInputMicButtonDeco
             scaleSpeed: 0.2,
             isCircle: false
         )
-        self.bigBlob = BlobNode(
+        self.bigBlob = ModernBlobNode(
             pointsCount: 8,
             minRandomness: 1,
             maxRandomness: 1,
@@ -110,14 +96,12 @@ public final class VoiceBlobView: UIView, TGModernConversationInputMicButtonDeco
         
         self.addSubnode(self.bigBlob)
         self.addSubnode(self.mediumBlob)
-        self.addSubnode(self.smallBlob)
         
         displayLinkAnimator = ConstantDisplayLinkAnimator() { [weak self] in
             guard let strongSelf = self else { return }
             
             strongSelf.presentationAudioLevel = strongSelf.presentationAudioLevel * 0.9 + strongSelf.audioLevel * 0.1
             
-            strongSelf.smallBlob.level = strongSelf.presentationAudioLevel
             strongSelf.mediumBlob.level = strongSelf.presentationAudioLevel
             strongSelf.bigBlob.level = strongSelf.presentationAudioLevel
         }
@@ -141,7 +125,6 @@ public final class VoiceBlobView: UIView, TGModernConversationInputMicButtonDeco
         if let isManuallyInHierarchy = self.isManuallyInHierarchy, !isManuallyInHierarchy {
             return
         }
-        smallBlob.setColor(color, animated: animated)
         mediumBlob.setColor(color.withAlphaComponent(mediumAlpha), animated: animated)
         bigBlob.setColor(color.withAlphaComponent(bigAlpha), animated: animated)
     }
@@ -153,7 +136,6 @@ public final class VoiceBlobView: UIView, TGModernConversationInputMicButtonDeco
     public func updateLevel(_ level: CGFloat, immediately: Bool = false) {
         let normalizedLevel = min(1, max(level / maxLevel, 0))
         
-        smallBlob.updateSpeedLevel(to: normalizedLevel)
         mediumBlob.updateSpeedLevel(to: normalizedLevel)
         bigBlob.updateSpeedLevel(to: normalizedLevel)
         
@@ -202,13 +184,11 @@ public final class VoiceBlobView: UIView, TGModernConversationInputMicButtonDeco
     
     private func updateBlobsState() {
         if self.isAnimating {
-            if self.smallBlob.frame.size != .zero {
-                smallBlob.startAnimating()
+            if self.frame.size != .zero {
                 mediumBlob.startAnimating()
                 bigBlob.startAnimating()
             }
         } else {
-            smallBlob.stopAnimating()
             mediumBlob.stopAnimating()
             bigBlob.stopAnimating()
         }
@@ -217,7 +197,6 @@ public final class VoiceBlobView: UIView, TGModernConversationInputMicButtonDeco
     override public func layoutSubviews() {
         super.layoutSubviews()
         
-        self.smallBlob.frame = bounds
         self.mediumBlob.frame = bounds
         self.bigBlob.frame = bounds
         
@@ -225,7 +204,7 @@ public final class VoiceBlobView: UIView, TGModernConversationInputMicButtonDeco
     }
 }
 
-final class BlobNode: ASDisplayNode {
+final class ModernBlobNode: ASDisplayNode {
     let pointsCount: Int
     let smoothness: CGFloat
     
@@ -499,7 +478,7 @@ private extension UIBezierPath {
         return sqrt((fromPoint.x - toPoint.x) * (fromPoint.x - toPoint.x) + (fromPoint.y - toPoint.y) * (fromPoint.y - toPoint.y))
     }
     
-    struct SmoothPoint {
+    struct ModernSmoothPoint {
         let point: CGPoint
         
         let inAngle: CGFloat

@@ -865,6 +865,15 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             break
         }
         
+        switch callState.state {
+        case .waiting, .ringing, .requesting, .connecting:
+            self.avatarNode.mode = .pulsing
+        case .active, .reconnecting:
+            self.avatarNode.mode = .showingVolume
+        case .terminated, .terminating:
+            self.avatarNode.mode = .end
+        }
+        
         self.callState = callState
         
         var statusReception: Int32?
