@@ -469,6 +469,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     
     private var currentRequestedAspect: CGFloat?
     
+    private var lastReceivedTimestamp: Double?
+    
     init(sharedContext: SharedAccountContext, account: Account, presentationData: PresentationData, statusBar: StatusBar, debugInfo: Signal<(String, String), NoError>, shouldStayHiddenUntilConnection: Bool = false, easyDebugAccess: Bool, call: PresentationCall) {
         self.sharedContext = sharedContext
         self.account = account
@@ -1068,51 +1070,55 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         let statusValue: ModernCallStatus
         
         switch callState.state {
-            case .waiting, .connecting:
-            statusValue = .text(string: self.presentationData.strings.Call_StatusConnecting, type: .loading)
-            case let .requesting(ringing):
-                if ringing {
-                    statusValue = .text(string: self.presentationData.strings.Call_StatusRinging, type: .loading)
-                } else {
-                    statusValue = .text(string: self.presentationData.strings.Call_StatusRequesting, type: .loading)
-                }
-            case .terminating:
-                statusValue = .text(string: self.presentationData.strings.Call_StatusEnded, type: .loading)
+        case .waiting, .requesting(false):
+            statusValue = .text(string: "Requesting", loading: true)
+        case .requesting(true):
+            statusValue = .text(string: "Ringing", loading: true)
+        case .connecting:
+            statusValue = .text(string: "Exchanging encryption keys", loading: true)
+        case .terminating:
+            statusValue = .callEnded(lastReceivedTimestamp ?? 0.0)
             case let .terminated(_, reason, _):
                 if let reason = reason {
                     switch reason {
                         case let .ended(type):
                             switch type {
-                                case .busy:
-                                    statusValue = .text(string: self.presentationData.strings.Call_StatusBusy, type: .callEnded)
-                                case .hungUp, .missed:
-                                    statusValue = .text(string: self.presentationData.strings.Call_StatusEnded, type: .callEnded)
-                            }
-                        case let .error(error):
-                            let text = self.presentationData.strings.Call_StatusFailed
-                            switch error {
-                            case let .notSupportedByPeer(isVideo):
-                                if !self.displayedVersionOutdatedAlert, let peer = self.peer {
-                                    self.displayedVersionOutdatedAlert = true
-                                    
-                                    let text: String
-                                    if isVideo {
-                                        text = self.presentationData.strings.Call_ParticipantVideoVersionOutdatedError(EnginePeer(peer).displayTitle(strings: self.presentationData.strings, displayOrder: self.presentationData.nameDisplayOrder)).string
-                                    } else {
-                                        text = self.presentationData.strings.Call_ParticipantVersionOutdatedError(EnginePeer(peer).displayTitle(strings: self.presentationData.strings, displayOrder: self.presentationData.nameDisplayOrder)).string
-                                    }
-                                    
-                                    self.present?(textAlertController(sharedContext: self.sharedContext, title: nil, text: text, actions: [TextAlertAction(type: .defaultAction, title: self.presentationData.strings.Common_OK, action: {
-                                    })]))
+                            case .busy:
+                                statusValue = .text(string: self.presentationData.strings.Call_StatusBusy, loading: false)
+                            case .hungUp, .missed:
+                                // TODO: timur
+                                if let lastReceivedTimestamp = self.lastReceivedTimestamp {
+                                    statusValue = .callEnded(lastReceivedTimestamp)
+                                } else {
+                                    statusValue = .text(string: self.presentationData.strings.Call_StatusEnded, loading: false)
                                 }
-                            default:
-                                break
+                                
                             }
-                        statusValue = .text(string: text, type: .callEnded)
+                case let .error(error):
+                    let text = self.presentationData.strings.Call_StatusFailed
+                    switch error {
+                    case let .notSupportedByPeer(isVideo):
+                        if !self.displayedVersionOutdatedAlert, let peer = self.peer {
+                            self.displayedVersionOutdatedAlert = true
+                            
+                            let text: String
+                            if isVideo {
+                                text = self.presentationData.strings.Call_ParticipantVideoVersionOutdatedError(EnginePeer(peer).displayTitle(strings: self.presentationData.strings, displayOrder: self.presentationData.nameDisplayOrder)).string
+                            } else {
+                                text = self.presentationData.strings.Call_ParticipantVersionOutdatedError(EnginePeer(peer).displayTitle(strings: self.presentationData.strings, displayOrder: self.presentationData.nameDisplayOrder)).string
+                            }
+                            
+                            self.present?(textAlertController(sharedContext: self.sharedContext, title: nil, text: text, actions: [TextAlertAction(type: .defaultAction, title: self.presentationData.strings.Common_OK, action: {
+                            })]))
+                        }
+                    default:
+                        break
                     }
-                } else {
-                    statusValue = .text(string: self.presentationData.strings.Call_StatusEnded, type: .callEnded)
+                    statusValue = .text(string: text, loading: false)
                 }
+            } else {
+                statusValue = .text(string: self.presentationData.strings.Call_StatusEnded, loading: false)
+            }
             case .ringing:
                 var text: String
                 if self.call.isVideo {
@@ -1123,8 +1129,10 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 if !self.statusNode.subtitle.isEmpty {
                     text += "\n\(self.statusNode.subtitle)"
                 }
-                statusValue = .text(string: text, type: .loading)
-            case .active(let timestamp, let reception, let keyVisualHash), .reconnecting(let timestamp, let reception, let keyVisualHash):
+                statusValue = .text(string: text, loading: true)
+            case .active(let timestamp, let reception, let keyVisualHash),
+                    .reconnecting(let timestamp, let reception, let keyVisualHash):
+                self.lastReceivedTimestamp = timestamp
                 let strings = self.presentationData.strings
                 var isReconnecting = false
                 if case .reconnecting = callState.state {
@@ -1567,16 +1575,16 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         let toastCollapsedOriginY = self.pictureInPictureTransitionFraction > 0.0 ? layout.size.height : layout.size.height - max(layout.intrinsicInsets.bottom, 20.0) - toastHeight
         let toastOriginY = interpolate(from: toastCollapsedOriginY, to: defaultButtonsOriginY - toastSpacing - toastHeight, value: uiDisplayTransition)
         
-        var overlayAlpha: CGFloat = min(pinchTransitionAlpha, uiDisplayTransition)
-        var toastAlpha: CGFloat = min(pinchTransitionAlpha, pipTransitionAlpha)
+        let overlayAlpha: CGFloat = min(pinchTransitionAlpha, uiDisplayTransition)
+        let toastAlpha: CGFloat = min(pinchTransitionAlpha, pipTransitionAlpha)
         
-        switch self.callState?.state {
-        case .terminated, .terminating:
-            overlayAlpha *= 0.5
-            toastAlpha *= 0.5
-        default:
-            break
-        }
+//        switch self.callState?.state {
+//        case .terminated, .terminating:
+//            overlayAlpha *= 0.5
+//            toastAlpha *= 0.5
+//        default:
+//            break
+//        }
         
         let containerFullScreenFrame = CGRect(origin: CGPoint(), size: layout.size)
         let containerPictureInPictureFrame = self.calculatePictureInPictureContainerRect(layout: layout, navigationHeight: navigationBarHeight)
