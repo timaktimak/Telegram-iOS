@@ -362,7 +362,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     private var presentationData: PresentationData
     private var peer: Peer?
     private let debugInfo: Signal<(String, String), NoError>
-    private var forceReportRating = false
+    private var forceReportRating = true
     private let easyDebugAccess: Bool
     private let call: PresentationCall
     
@@ -439,7 +439,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     var acceptCall: (() -> Void)?
     var endCall: (() -> Void)?
     var back: (() -> Void)?
-    var presentCallRating: ((CallId, Bool) -> Void)?
+//    var presentCallRating: ((CallId, Bool) -> Void)?
     var callEnded: ((Bool) -> Void)?
     var dismissedInteractively: (() -> Void)?
     var present: ((ViewController) -> Void)?
@@ -1211,12 +1211,28 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             }
         }
         
-        if case let .terminated(id, _, reportRating) = callState.state, let callId = id {
+        if case let .terminated(_, _, reportRating) = callState.state {//, let callId = id {
             let presentRating = reportRating || self.forceReportRating
             if presentRating {
-                self.presentCallRating?(callId, self.call.isVideo)
+//                self.presentCallRating?(callId, self.call.isVideo)
+                self.buttonsNode.layer.animateAlpha(from: 1, to: 0, duration: 0.3, removeOnCompletion: false)
+                
+                let rateView = ModernCallRateNode { _ in
+                    
+                }
+                self.containerNode.addSubnode(rateView)
+                rateView.frame = CGRect(x: 45, y: self.buttonsNode.frame.minY - 66 - 142, width: self.bounds.width - 90, height: 142)
+//                rateView.layer.animateScale(from: 0.6, to: 1, duration: 3, timingFunction: kCAMediaTimingFunctionSpring)
+//                rateView.layer.animateAlpha(from: 0, to: 1, duration: 3)
+                
+                let closeButton = ModernCallCloseButton()
+                self.containerNode.addSubnode(closeButton)
+//                closeButton.frame = self.buttonsNode.frame
+                closeButton.frame = CGRect(x: 45, y: self.buttonsNode.frame.minY, width: self.bounds.width - 90, height: 50)
+                closeButton.layer.animateAlpha(from: 0, to: 1, duration: 0.3)
+                
             }
-            self.callEnded?(presentRating)
+//            self.callEnded?(presentRating)
         }
         
         let hasIncomingVideoNode = self.incomingVideoNodeValue != nil && self.expandedVideoNode === self.incomingVideoNodeValue

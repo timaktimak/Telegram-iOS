@@ -61,6 +61,7 @@ final class ModernCallAvatarNode: ASDisplayNode {
                     self.layer.removeAnimation(forKey: "pulsing")
                 }
             case .end:
+                self.layer.removeAnimation(forKey: "pulsing")
                 self.voiceNode.stopAnimating()
             case nil:
                 break

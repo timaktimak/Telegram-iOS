@@ -23,7 +23,7 @@ protocol ModernCallControllerNodeProtocol: AnyObject {
     var acceptCall: (() -> Void)? { get set }
     var endCall: (() -> Void)? { get set }
     var back: (() -> Void)? { get set }
-    var presentCallRating: ((CallId, Bool) -> Void)? { get set }
+//    var presentCallRating: ((CallId, Bool) -> Void)? { get set }
     var present: ((ViewController) -> Void)? { get set }
     var callEnded: ((Bool) -> Void)? { get set }
     var dismissedInteractively: (() -> Void)? { get set }
@@ -232,26 +232,26 @@ public final class ModernCallController: ViewController {
             let _ = self?.dismiss()
         }
         
-        self.controllerNode.presentCallRating = { [weak self] callId, isVideo in
-            if let strongSelf = self, !strongSelf.presentedCallRating {
-                strongSelf.presentedCallRating = true
-                
-                Queue.mainQueue().after(0.5, {
-                    let window = strongSelf.window
-                    let controller = callRatingController(sharedContext: strongSelf.sharedContext, account: strongSelf.account, callId: callId, userInitiated: false, isVideo: isVideo, present: { c, a in
-                        if let window = window {
-                            c.presentationArguments = a
-                            window.present(c, on: .root, blockInteraction: false, completion: {})
-                        }
-                    }, push: { [weak self] c in
-                        if let strongSelf = self {
-                            strongSelf.push(c)
-                        }
-                    })
-                    strongSelf.present(controller, in: .window(.root))
-                })
-            }
-        }
+//        self.controllerNode.presentCallRating = { [weak self] callId, isVideo in
+//            if let strongSelf = self, !strongSelf.presentedCallRating {
+//                strongSelf.presentedCallRating = true
+//
+//                Queue.mainQueue().after(0.5, {
+//                    let window = strongSelf.window
+//                    let controller = callRatingController(sharedContext: strongSelf.sharedContext, account: strongSelf.account, callId: callId, userInitiated: false, isVideo: isVideo, present: { c, a in
+//                        if let window = window {
+//                            c.presentationArguments = a
+//                            window.present(c, on: .root, blockInteraction: false, completion: {})
+//                        }
+//                    }, push: { [weak self] c in
+//                        if let strongSelf = self {
+//                            strongSelf.push(c)
+//                        }
+//                    })
+//                    strongSelf.present(controller, in: .window(.root))
+//                })
+//            }
+//        }
         
         self.controllerNode.present = { [weak self] controller in
             if let strongSelf = self {
