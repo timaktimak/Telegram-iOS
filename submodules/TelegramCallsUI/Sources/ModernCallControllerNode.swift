@@ -336,7 +336,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                                 
                                 let wrapper = ModernCallPreviewableVideoNode(sharedContext: sharedContext, cameraNode: outgoingVideoNode)
                                 
-                                strongSelf.addSubnode(wrapper)
+                                strongSelf.containerNode.addSubnode(wrapper)
                                 wrapper.frame = strongSelf.bounds
                                 
                                 if let (layout, navigationBarHeight) = self?.validLayout {

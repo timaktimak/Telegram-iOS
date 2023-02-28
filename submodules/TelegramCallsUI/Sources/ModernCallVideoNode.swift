@@ -392,9 +392,9 @@ final class ModernCallPreviewableVideoNode: ViewControllerTracingNode, UIScrollV
             contentFrame = CGRect(origin: CGPoint(x: sideInset, y: layout.size.height - contentSize.height), size: contentSize)
         }
         var backgroundFrame = contentFrame
-        if !isTablet {
-            backgroundFrame.size.height += 2000.0
-        }
+//        if !isTablet {
+//            backgroundFrame.size.height += 2000.0
+//        }
         if backgroundFrame.minY < contentFrame.minY {
             backgroundFrame.origin.y = contentFrame.minY
         }
@@ -418,7 +418,7 @@ final class ModernCallPreviewableVideoNode: ViewControllerTracingNode, UIScrollV
             previewSize = CGSize(width: contentFrame.width, height: min(contentFrame.height, ceil(contentFrame.width * previewAspectRatio)))
             previewFrame = CGRect(origin: CGPoint(), size: previewSize)
         }
-//        previewFrame = bounds
+        previewFrame = bounds
         transition.updateFrame(node: self.previewContainerNode, frame: previewFrame)
         transition.updateFrame(node: self.shimmerNode, frame: CGRect(origin: CGPoint(), size: previewFrame.size))
         self.shimmerNode.update(foregroundColor: UIColor(rgb: 0xffffff, alpha: 0.07))
@@ -456,7 +456,7 @@ final class ModernCallPreviewableVideoNode: ViewControllerTracingNode, UIScrollV
     }
 }
 
-private let textFont = Font.with(size: 14.0, design: .camera, weight: .regular)
+private let textFont = Font.with(size: 14.0, design: .camera, weight: .semibold)
 private let selectedTextFont = Font.with(size: 14.0, design: .camera, weight: .semibold)
 
 private class WheelControlNode: ASDisplayNode, UIGestureRecognizerDelegate {
@@ -581,7 +581,7 @@ private class WheelControlNode: ASDisplayNode, UIGestureRecognizerDelegate {
                 if itemNode.isSelected != isSelected {
                     itemNode.isSelected = isSelected
                     let title = itemNode.attributedTitle(for: .normal)?.string ?? ""
-                    itemNode.setTitle(title, with: isSelected ? selectedTextFont : textFont, with: isSelected ? UIColor(rgb: 0xffd60a) : .white, for: .normal)
+                    itemNode.setTitle(title, with: isSelected ? selectedTextFont : textFont, with: isSelected ? .white : .white.withAlphaComponent(0.5), for: .normal)
                     if isSelected {
                         itemNode.accessibilityTraits.insert(.selected)
                     } else {
