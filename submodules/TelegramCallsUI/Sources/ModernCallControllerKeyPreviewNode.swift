@@ -13,12 +13,14 @@ final class ModernCallControllerKeyPreviewNode: ASDisplayNode {
     private let subtitleTextNode: ASTextNode
     private let okTextNode: ASTextNode
     
-    private let background: ASDisplayNode
+    private let topBackground: ASDisplayNode
+    private let botBackground: ASDisplayNode
+    private let separator: ASDisplayNode
     private let dismiss: () -> Void
     
     private var validLayout: CGSize?
     
-    init(title: String, subtitle: String, ok: String, isDark: Bool, dismiss: @escaping () -> Void) {
+    init(title: String, subtitle: String, ok: String, dismiss: @escaping () -> Void) {
         self.titleTextNode = ASTextNode()
         self.titleTextNode.displaysAsynchronously = false
         self.titleTextNode.attributedText = NSAttributedString(string: title, font: Font.medium(16), textColor: UIColor.white)
@@ -34,17 +36,29 @@ final class ModernCallControllerKeyPreviewNode: ASDisplayNode {
         self.okTextNode.attributedText = NSAttributedString(string: ok, font: Font.regular(20), textColor: UIColor.white)
         self.okTextNode.textAlignment = .center
         
-        self.background = ASDisplayNode()
+        self.topBackground = ASDisplayNode()
+        self.topBackground.clipsToBounds = false
+        self.botBackground = ASDisplayNode()
+        self.botBackground.clipsToBounds = false
+        self.separator = ASDisplayNode()
+        
         self.dismiss = dismiss
         
         super.init()
         self.displaysAsynchronously = false
-        self.addSubnode(self.background)
+        self.addSubnode(self.topBackground)
+        self.addSubnode(self.botBackground)
+        self.addSubnode(self.separator)
         self.addSubnode(self.titleTextNode)
         self.addSubnode(self.subtitleTextNode)
         self.addSubnode(self.okTextNode)
-        self.background.backgroundColor = isDark ? UIColor(rgb: 0x0, alpha: 0.5) : UIColor(rgb: 0xFFFFFF, alpha: 0.25)
-        self.background.cornerRadius = 20
+    }
+    
+    func set(isDark: Bool) {
+        self.topBackground.backgroundColor = isDark ? UIColor(rgb: 0x0, alpha: 0.5) : UIColor(rgb: 0xFFFFFF, alpha: 0.25)
+        self.botBackground.backgroundColor = isDark ? UIColor(rgb: 0x0, alpha: 0.5) : UIColor(rgb: 0xFFFFFF, alpha: 0.25)
+        self.separator.backgroundColor = UIColor(rgb: 0x0, alpha: 0.75)
+        self.separator.isHidden = !isDark
     }
     
     func updateLayout(size: CGSize) {
@@ -59,6 +73,11 @@ final class ModernCallControllerKeyPreviewNode: ASDisplayNode {
     override func didLoad() {
         super.didLoad()
         
+        self.topBackground.cornerRadius = 20
+        self.topBackground.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        self.botBackground.cornerRadius = 20
+        self.botBackground.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        
         self.view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.tapGesture(_:))))
     }
     
@@ -70,6 +89,9 @@ final class ModernCallControllerKeyPreviewNode: ASDisplayNode {
     
     override func layout() {
         super.layout()
-        self.background.view.frame = self.view.bounds
+        let pixel = 1.0 / UIScreen.main.scale
+        self.topBackground.frame = CGRect(x: 0, y: 0, width: self.bounds.width, height: self.bounds.height - 56.0 - pixel)
+        self.separator.frame = CGRect(x: 0, y: self.bounds.height - 56.0 - pixel, width: self.bounds.width, height: pixel)
+        self.botBackground.frame = CGRect(x: 0, y: self.bounds.height - 56.0, width: self.bounds.width, height: 56.0)
     }
 }
