@@ -232,6 +232,9 @@ final class ModernCallCloseButton: ASDisplayNode {
     private var left: ActionlessLayer!
     private var right: ActionlessLayer!
     
+    private var topAngExtension: ActionlessLayer!
+    private var botAngExtension: ActionlessLayer!
+    
     private let bigRadius = CGFloat(14)
     private let smallRadius = CGFloat(10)
     
@@ -334,9 +337,15 @@ final class ModernCallCloseButton: ASDisplayNode {
         self.layer.addSublayer(self.centerBackground)
         
         self.topAngle = Angle(type: .topLeft)
-        self.layer.addSublayer(topAngle)
+        self.layer.addSublayer(self.topAngle)
+        self.topAngExtension = ActionlessLayer()
+        self.topAngExtension.backgroundColor = UIColor.white.cgColor
+        self.topAngle.addSublayer(self.topAngExtension)
         self.botAngle = Angle(type: .bottomLeft)
-        self.layer.addSublayer(botAngle)
+        self.layer.addSublayer(self.botAngle)
+        self.botAngExtension = ActionlessLayer()
+        self.botAngExtension.backgroundColor = UIColor.white.cgColor
+        self.botAngle.addSublayer(self.botAngExtension)
         
         self.topRightAngle = Angle(type: .topRight)
         self.layer.addSublayer(topRightAngle)
@@ -368,9 +377,12 @@ final class ModernCallCloseButton: ASDisplayNode {
         self.leftBackground.frame = CGRect(x: 0, y: br, width: (self.bounds.width - CloseImageLayer.size.width) / 2.0, height: CloseImageLayer.size.height)
         self.rightBackground.frame = CGRect(x: (self.bounds.width + CloseImageLayer.size.width) / 2.0, y: br, width: (self.bounds.width - CloseImageLayer.size.width) / 2.0, height: CloseImageLayer.size.height)
         
+        let pixel = 1.0 / UIScreen.main.scale
         self.topAngle.frame = CGRect(x: 0, y: 0, width: br, height: br)
+        self.topAngExtension.frame = CGRect(x: self.topAngle.bounds.width - pixel, y: 0, width: pixel, height: self.topAngle.bounds.height)
         self.top.frame = CGRect(x: 14, y: 0, width: self.bounds.width - 2.0 * br, height: br)
         self.bottom.frame = CGRect(x: 14, y: self.bounds.height - br, width: self.bounds.width - 2.0 * br, height: br)
+        self.botAngExtension.frame = CGRect(x: self.botAngle.bounds.width - pixel, y: 0, width: pixel, height: self.botAngle.bounds.height)
         self.botAngle.frame = CGRect(x: 0, y: self.frame.height - 14, width: 14, height: 14)
         
         self.topRightAngle.frame = CGRect(x: self.bounds.width - br, y: 0, width: br, height: br)
