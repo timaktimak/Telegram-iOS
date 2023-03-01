@@ -369,11 +369,95 @@ private final class ModernCallControllerReceptionNodeParameters: NSObject {
 
 private let receptionNodeSize = CGSize(width: 20.0, height: 20.0)
 
+private class ActionlessLayer: CALayer {
+    override func action(forKey event: String) -> CAAction? {
+        return nil
+    }
+}
+
 final class ModernCallControllerReceptionNode : ASDisplayNode {
-    var reception: Int32 = 4 {
+    var reception: Int32 = 0 {
         didSet {
-            self.setNeedsDisplay()
+            animateIfNeeded()
         }
+    }
+    
+    private var presentationReception: Int32 = 0
+    private var isAnimating = false
+    
+    private let duration = 0.2
+    
+    private var bars: [ActionlessLayer] = []
+    
+    private func animateIfNeeded() {
+        if isAnimating {
+            return
+        }
+        if reception > presentationReception {
+            animate(begin: presentationReception, end: reception, fill: true)
+        }
+        if reception < presentationReception {
+            animate(begin: presentationReception - 1, end: reception - 1, fill: false)
+        }
+    }
+    
+    private func animate(begin: Int32, end: Int32, fill: Bool) {
+        assert(begin != end)
+        
+        isAnimating = true
+        presentationReception = reception
+        
+        let step = (end - begin) / abs(end - begin)
+        var delay = 0.0
+        var i = begin
+        while i != end {
+            if i + step == end {
+                self.animate(bar: self.bars[Int(i)], delay: delay, filled: fill, completion: { [weak self] in
+                    self?.isAnimating = false
+                    self?.animateIfNeeded()
+                })
+            } else {
+                self.animate(bar: self.bars[Int(i)], delay: delay, filled: fill, completion: { })
+            }
+            
+            delay += duration / 2.0
+            i += step
+        }
+    }
+    
+    private func animate(bar: ActionlessLayer, delay: Double, filled: Bool, completion: @escaping () -> Void) {
+        let currentTime = CACurrentMediaTime()
+        
+        if let presentation = bar.presentation() {
+            bar.opacity = presentation.opacity
+        }
+        let opacity = CABasicAnimation(keyPath: "opacity")
+        opacity.toValue = filled ? 1.0 : 0.5
+        opacity.duration = duration / 2.0
+        opacity.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        opacity.beginTime = currentTime + delay + (filled ? 0.0 : duration / 2.0)
+        opacity.isRemovedOnCompletion = false
+        opacity.fillMode = .forwards
+        bar.add(opacity, forKey: "barOpacity")
+        
+        let position = CABasicAnimation(keyPath: "position.y")
+        position.byValue = -2.0 / UIScreen.main.scale
+        position.duration = duration
+        position.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        position.autoreverses = true
+        position.beginTime = currentTime + delay
+        bar.add(position, forKey: "barPosition")
+        
+        let height = CABasicAnimation(keyPath: "bounds.size.height")
+        height.byValue = 4.0 / UIScreen.main.scale
+        height.duration = duration
+        height.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        height.autoreverses = true
+        height.beginTime = currentTime + delay
+        height.completion = { _ in
+            completion()
+        }
+        bar.add(height, forKey: "barHeight")
     }
     
     override init() {
@@ -383,33 +467,27 @@ final class ModernCallControllerReceptionNode : ASDisplayNode {
         self.isLayerBacked = true
     }
     
-    override func drawParameters(forAsyncLayer layer: _ASDisplayLayer) -> NSObjectProtocol? {
-        return ModernCallControllerReceptionNodeParameters(reception: self.reception)
+    override func didLoad() {
+        super.didLoad()
+        for _ in 0..<4 {
+            let bar = ActionlessLayer()
+            bar.backgroundColor = UIColor.white.cgColor
+            bar.opacity = 0.5
+            bar.masksToBounds = false
+            bar.cornerRadius = 1
+            self.bars.append(bar)
+            self.layer.addSublayer(bar)
+        }
     }
     
-    @objc override class func draw(_ bounds: CGRect, withParameters parameters: Any?, isCancelled: () -> Bool, isRasterizing: Bool) {
-        let context = UIGraphicsGetCurrentContext()!
-        context.setFillColor(UIColor.white.cgColor)
-        
-        if let parameters = parameters as? ModernCallControllerReceptionNodeParameters{
-            let width: CGFloat = 3.0
-            var spacing: CGFloat = 1.5
-            if UIScreenScale > 2 {
-                spacing = 4.0 / 3.0
-            }
-            
-            for i in 0 ..< 4 {
-                let height = 3.0 * CGFloat(i + 1)
-                let rect = CGRect(x: bounds.minX + 1.0 + CGFloat(i) * (width + spacing), y: receptionNodeSize.height - height - 3.0, width: width, height: height)
-                
-                if i >= parameters.reception {
-                    context.setAlpha(0.4)
-                }
-                
-                let path = UIBezierPath(roundedRect: rect, cornerRadius: 0.5)
-                context.addPath(path.cgPath)
-                context.fillPath()
-            }
+    override func layout() {
+        super.layout()
+        var x = 1.0
+        var h = 3.0
+        for bar in self.bars {
+            bar.frame = CGRect(x: x, y: self.bounds.height - 4.0 - h, width: 3.0, height: h)
+            x += 5.0
+            h += 3.0
         }
     }
 }
