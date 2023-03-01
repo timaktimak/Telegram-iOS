@@ -32,6 +32,30 @@ protocol ModernCallVideoNodeProtocol {
     func hideContentItems()
 }
 
+private final class ModernPreviewDoneButton: ASControlNode {
+    override init() {
+        super.init()
+        self.isOpaque = false
+        self.displaysAsynchronously = false
+    }
+    
+    override class func draw(_ bounds: CGRect, withParameters parameters: Any?, isCancelled isCancelledBlock: () -> Bool, isRasterizing: Bool) {
+        guard !isCancelledBlock(), let context = UIGraphicsGetCurrentContext() else {
+            return
+        }
+        
+        context.setFillColor(UIColor.white.cgColor)
+        let path = UIBezierPath(roundedRect: bounds, cornerRadius: 10)
+        context.addPath(path.cgPath)
+        context.drawPath(using: .fill)
+        
+        context.setBlendMode(.clear)
+        let textSize = CGSize(width: 90, height: 21)
+        let attributedString = NSAttributedString(string: "Start Video", font: Font.semibold(17))
+        attributedString.draw(in: CGRect(origin: CGPoint(x: (bounds.size.width - textSize.width) / 2.0, y: (bounds.size.height - textSize.height) / 2.0), size: textSize))
+    }
+}
+
 final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate, ModernCallVideoNodeProtocol {
     private let sharedContext: SharedAccountContext
     private var presentationData: PresentationData
@@ -45,7 +69,7 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
     private let titleNode: ASTextNode
     private let previewContainerNode: ASDisplayNode
     private let shimmerNode: ShimmerEffectForegroundNode
-    private let doneButton: SolidRoundedButtonNode
+    private let doneButton: ModernPreviewDoneButton
     private var broadcastPickerView: UIView?
     private let cancelButton: HighlightableButtonNode
     
@@ -102,9 +126,8 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
         
         self.titleNode = ASTextNode()
         self.titleNode.attributedText = NSAttributedString(string: title, font: Font.bold(17.0), textColor: UIColor(rgb: 0xffffff))
-                
-        self.doneButton = SolidRoundedButtonNode(theme: SolidRoundedButtonTheme(backgroundColor: UIColor(rgb: 0xffffff), foregroundColor: UIColor(rgb: 0x4f5352)), font: .bold, height: 48.0, cornerRadius: 24.0, gloss: false)
-        self.doneButton.title = self.presentationData.strings.VoiceChat_VideoPreviewContinue
+        
+        self.doneButton = ModernPreviewDoneButton()
         
         if #available(iOS 12.0, *) {
             let broadcastPickerView = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 50, height: 52.0))
@@ -155,7 +178,6 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
         self.backgroundNode.addSubnode(self.contentBackgroundNode)
         self.contentContainerNode.addSubnode(self.previewContainerNode)
         self.contentContainerNode.addSubnode(self.titleNode)
-        self.doneButton.backgroundColor = UIColor.blue
         self.contentContainerNode.addSubnode(self.doneButton)
         if let broadcastPickerView = self.broadcastPickerView {
             self.contentContainerNode.view.addSubview(broadcastPickerView)
@@ -168,7 +190,6 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
         self.previewContainerNode.addSubnode(self.placeholderTextNode)
         
         self.previewContainerNode.addSubnode(self.wheelNode)
-        self.wheelNode.backgroundColor = UIColor.green
 
         self.wheelNode.selectedIndexChanged = { [weak self] index in
             if let strongSelf = self {
@@ -192,11 +213,7 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
             }
         }
         
-        self.doneButton.pressed = { [weak self] in
-            if let strongSelf = self {
-                strongSelf.shareCamera?(true)
-            }
-        }
+        self.doneButton.addTarget(self, action: #selector(self.donePressed), forControlEvents: .touchUpInside)
         self.cancelButton.addTarget(self, action: #selector(self.cancelPressed), forControlEvents: .touchUpInside)
         
         self.readyDisposable.set(self.videoNode.ready.start(next: { [weak self] ready in
@@ -215,6 +232,7 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
     }
        
     func hideContentItems() {
+        // TODO: timur
 //        let duration = 0.2
 //        self.titleNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration)
 //        self.cancelButton.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration)
@@ -261,6 +279,10 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
             self.wheelNode.setSelectedIndex(self.selectedTabIndex - 1, animated: true)
             self.wheelNode.selectedIndexChanged(self.wheelNode.selectedIndex)
         }
+    }
+    
+    @objc func donePressed() {
+        self.shareCamera?(true)
     }
     
     @objc func cancelPressed() {
@@ -446,11 +468,12 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
         
 //        let buttonWidth = min(buttonMaxWidth, contentFrame.width - buttonInset * 2.0)
         let buttonWidth = min(buttonMaxWidth, self.bounds.width - buttonInset * 2.0)
-        let doneButtonHeight = self.doneButton.updateLayout(width: buttonWidth, transition: transition)
-        transition.updateFrame(node: self.doneButton, frame: CGRect(x: floorToScreenPixels((self.bounds.width - buttonWidth) / 2.0), y: previewFrame.maxY - doneButtonHeight - max(layout.intrinsicInsets.bottom + 14.0, 16.0), width: buttonWidth, height: doneButtonHeight))
+        let doneButtonHeight = 50.0
+        let doneButtonFrame = CGRect(x: floorToScreenPixels((self.bounds.width - buttonWidth) / 2.0), y: previewFrame.maxY - doneButtonHeight - max(layout.intrinsicInsets.bottom + 14.0, 16.0), width: buttonWidth, height: doneButtonHeight)
+        transition.updateFrame(node: self.doneButton, frame: doneButtonFrame)
         self.broadcastPickerView?.frame = self.doneButton.frame
         
-        let wheelFrame = CGRect(origin: CGPoint(x: 16.0 + previewFrame.minX, y: previewFrame.maxY - doneButtonHeight - buttonInset - 36.0 - 20.0), size: CGSize(width: previewFrame.width - 32.0, height: 36.0))
+        let wheelFrame = CGRect(origin: CGPoint(x: 16.0 + previewFrame.minX, y: doneButtonFrame.minY - 20.0 - 36.0), size: CGSize(width: previewFrame.width - 32.0, height: 36.0))
         self.wheelNode.updateLayout(size: wheelFrame.size, transition: transition)
         transition.updateFrame(node: self.wheelNode, frame: wheelFrame)
         
