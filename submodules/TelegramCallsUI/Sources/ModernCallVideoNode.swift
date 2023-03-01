@@ -20,12 +20,23 @@ import ContextUI
 import SolidRoundedButtonNode
 import ReplayKit
 
-final class ModernCallPreviewableVideoNode: ViewControllerTracingNode, UIScrollViewDelegate {
-//    private weak var controller: VoiceChatCameraPreviewController?
+protocol ModernCallVideoNodeProtocol {
+    var currentOrientation: PresentationCallVideoView.Orientation { get }
+    var currentAspect: CGFloat { get }
+    func animateRadialMask(from fromRect: CGRect, to toRect: CGRect, completion: @escaping () -> Void)
+    func updateLayout(size: CGSize, layoutMode: VideoNodeLayoutMode, transition: ContainedViewLayoutTransition)
+    func updateLayout(size: CGSize, cornerRadius: CGFloat, isOutgoing: Bool, deviceOrientation: UIDeviceOrientation, isCompactLayout: Bool, transition: ContainedViewLayoutTransition)
+    func updateIsBlurred(isBlurred: Bool, light: Bool, animated: Bool)
+    func flip(withBackground: Bool)
+    
+    func hideContentItems()
+}
+
+final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate, ModernCallVideoNodeProtocol {
     private let sharedContext: SharedAccountContext
     private var presentationData: PresentationData
     
-    private let cameraNode: PreviewVideoNode
+    private let videoNode: ModernCallVideoNode
     private let dimNode: ASDisplayNode
     private let wrappingScrollNode: ASScrollNode
     private let contentContainerNode: ASDisplayNode
@@ -56,15 +67,17 @@ final class ModernCallPreviewableVideoNode: ViewControllerTracingNode, UIScrollV
     var dismiss: (() -> Void)?
     var cancel: (() -> Void)?
     
-    init(sharedContext: SharedAccountContext, cameraNode: PreviewVideoNode) {
+    init(sharedContext: SharedAccountContext, videoNode: ModernCallVideoNode) {
         
         self.sharedContext = sharedContext
         self.presentationData = sharedContext.currentPresentationData.with { $0 }
         
-        self.cameraNode = cameraNode
+        self.videoNode = videoNode
         
         self.wrappingScrollNode = ASScrollNode()
-        self.wrappingScrollNode.view.alwaysBounceVertical = true
+        self.wrappingScrollNode.backgroundColor = UIColor.blue
+        self.wrappingScrollNode.scrollableDirections = [.left, .right]
+//        self.wrappingScrollNode.view.alwaysBounceVertical = true
         self.wrappingScrollNode.view.delaysContentTouches = false
         self.wrappingScrollNode.view.canCancelContentTouches = true
         
@@ -73,15 +86,17 @@ final class ModernCallPreviewableVideoNode: ViewControllerTracingNode, UIScrollV
         
         self.contentContainerNode = ASDisplayNode()
         self.contentContainerNode.isOpaque = false
+        self.contentContainerNode.backgroundColor = UIColor.cyan
 
         self.backgroundNode = ASDisplayNode()
         self.backgroundNode.clipsToBounds = true
         self.backgroundNode.cornerRadius = 16.0
+        self.backgroundNode.backgroundColor = UIColor.orange
         
-        let backgroundColor = UIColor(rgb: 0x000000)
+//        let backgroundColor = UIColor(rgb: 0x000000)
     
         self.contentBackgroundNode = ASDisplayNode()
-        self.contentBackgroundNode.backgroundColor = backgroundColor
+        self.contentBackgroundNode.backgroundColor = UIColor.purple// backgroundColor
         
         let title =  self.presentationData.strings.VoiceChat_VideoPreviewTitle
         
@@ -147,7 +162,7 @@ final class ModernCallPreviewableVideoNode: ViewControllerTracingNode, UIScrollV
         }
         self.contentContainerNode.addSubnode(self.cancelButton)
                 
-        self.previewContainerNode.addSubnode(self.cameraNode)
+        self.previewContainerNode.addSubnode(self.videoNode)
         
         self.previewContainerNode.addSubnode(self.placeholderIconNode)
         self.previewContainerNode.addSubnode(self.placeholderTextNode)
@@ -162,13 +177,13 @@ final class ModernCallPreviewableVideoNode: ViewControllerTracingNode, UIScrollV
                 }
                 if index == 0 && [1, 2].contains(strongSelf.selectedTabIndex) {
                     strongSelf.broadcastPickerView?.isHidden = false
-                    strongSelf.cameraNode.updateIsBlurred(isBlurred: true, light: false, animated: true)
+                    strongSelf.videoNode.updateIsBlurred(isBlurred: true, light: false, animated: true)
                     let transition = ContainedViewLayoutTransition.animated(duration: 0.3, curve: .easeInOut)
                     transition.updateAlpha(node: strongSelf.placeholderTextNode, alpha: 1.0)
                     transition.updateAlpha(node: strongSelf.placeholderIconNode, alpha: 1.0)
                 } else if [1, 2].contains(index) && strongSelf.selectedTabIndex == 0 {
                     strongSelf.broadcastPickerView?.isHidden = true
-                    strongSelf.cameraNode.updateIsBlurred(isBlurred: false, light: false, animated: true)
+                    strongSelf.videoNode.updateIsBlurred(isBlurred: false, light: false, animated: true)
                     let transition = ContainedViewLayoutTransition.animated(duration: 0.3, curve: .easeInOut)
                     transition.updateAlpha(node: strongSelf.placeholderTextNode, alpha: 0.0)
                     transition.updateAlpha(node: strongSelf.placeholderIconNode, alpha: 0.0)
@@ -184,7 +199,7 @@ final class ModernCallPreviewableVideoNode: ViewControllerTracingNode, UIScrollV
         }
         self.cancelButton.addTarget(self, action: #selector(self.cancelPressed), forControlEvents: .touchUpInside)
         
-        self.readyDisposable.set(self.cameraNode.ready.start(next: { [weak self] ready in
+        self.readyDisposable.set(self.videoNode.ready.start(next: { [weak self] ready in
             if let strongSelf = self, ready {
                 Queue.mainQueue().after(0.07) {
                     strongSelf.shimmerNode.alpha = 0.0
@@ -199,6 +214,21 @@ final class ModernCallPreviewableVideoNode: ViewControllerTracingNode, UIScrollV
         self.applicationStateDisposable?.dispose()
     }
        
+    func hideContentItems() {
+//        let duration = 0.2
+//        self.titleNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration)
+//        self.cancelButton.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration)
+//        self.wheelNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration)
+//        self.doneButton.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration)
+        
+        
+        self.titleNode.isHidden = true
+        self.cancelButton.isHidden = true
+        self.wheelNode.isHidden = true
+        self.doneButton.isHidden = true
+    }
+    
+    
     func updatePresentationData(_ presentationData: PresentationData) {
         self.presentationData = presentationData
     }
@@ -241,42 +271,6 @@ final class ModernCallPreviewableVideoNode: ViewControllerTracingNode, UIScrollV
         if case .ended = recognizer.state {
             self.cancel?()
         }
-    }
-    
-    func animateRadialMask(from fromRect: CGRect, to toRect: CGRect) {
-        let maskLayer = CAShapeLayer()
-        maskLayer.frame = fromRect
-        
-        let path = CGMutablePath()
-        path.addEllipse(in: CGRect(origin: CGPoint(), size: fromRect.size))
-        maskLayer.path = path
-        
-        self.layer.mask = maskLayer
-        
-        let topLeft = CGPoint(x: 0.0, y: 0.0)
-        let topRight = CGPoint(x: self.bounds.width, y: 0.0)
-        let bottomLeft = CGPoint(x: 0.0, y: self.bounds.height)
-        let bottomRight = CGPoint(x: self.bounds.width, y: self.bounds.height)
-        
-        func distance(_ v1: CGPoint, _ v2: CGPoint) -> CGFloat {
-            let dx = v1.x - v2.x
-            let dy = v1.y - v2.y
-            return sqrt(dx * dx + dy * dy)
-        }
-        
-        var maxRadius = distance(toRect.center, topLeft)
-        maxRadius = max(maxRadius, distance(toRect.center, topRight))
-        maxRadius = max(maxRadius, distance(toRect.center, bottomLeft))
-        maxRadius = max(maxRadius, distance(toRect.center, bottomRight))
-        maxRadius = ceil(maxRadius)
-        
-        let targetFrame = CGRect(origin: CGPoint(x: toRect.center.x - maxRadius, y: toRect.center.y - maxRadius), size: CGSize(width: maxRadius * 2.0, height: maxRadius * 2.0))
-        
-        let transition: ContainedViewLayoutTransition = .animated(duration: 3, curve: .easeInOut)
-        transition.updatePosition(layer: maskLayer, position: targetFrame.center)
-        transition.updateTransformScale(layer: maskLayer, scale: maxRadius * 2.0 / fromRect.width, completion: { [weak self] _ in
-            self?.layer.mask = nil
-        })
     }
     
     func animateIn() {
@@ -369,55 +363,62 @@ final class ModernCallPreviewableVideoNode: ViewControllerTracingNode, UIScrollV
         var insets = layout.insets(options: [.statusBar])
         insets.top = max(10.0, insets.top)
     
-        let contentSize: CGSize
-        if isLandscape {
-            if isTablet {
-                contentSize = CGSize(width: 870.0, height: 690.0)
-            } else {
-                contentSize = CGSize(width: layout.size.width, height: layout.size.height)
-            }
-        } else {
-            if isTablet {
-                contentSize = CGSize(width: 600.0, height: 960.0)
-            } else {
-                contentSize = CGSize(width: layout.size.width, height: layout.size.height - insets.top - 8.0)
-            }
-        }
-        
-        let sideInset = floor((layout.size.width - contentSize.width) / 2.0)
-        let contentFrame: CGRect
-        if isTablet {
-            contentFrame = CGRect(origin: CGPoint(x: sideInset, y: floor((layout.size.height - contentSize.height) / 2.0)), size: contentSize)
-        } else {
-            contentFrame = CGRect(origin: CGPoint(x: sideInset, y: layout.size.height - contentSize.height), size: contentSize)
-        }
-        var backgroundFrame = contentFrame
-//        if !isTablet {
-//            backgroundFrame.size.height += 2000.0
+//        let contentSize: CGSize
+//        if isLandscape {
+//            if isTablet {
+//                contentSize = CGSize(width: 870.0, height: 690.0)
+//            } else {
+//                contentSize = CGSize(width: layout.size.width, height: layout.size.height)
+//            }
+//        } else {
+//            if isTablet {
+//                contentSize = CGSize(width: 600.0, height: 960.0)
+//            } else {
+//                contentSize = CGSize(width: layout.size.width, height: layout.size.height - insets.top - 8.0)
+//            }
 //        }
-        if backgroundFrame.minY < contentFrame.minY {
-            backgroundFrame.origin.y = contentFrame.minY
-        }
-        transition.updateFrame(node: self.backgroundNode, frame: backgroundFrame)
-        transition.updateFrame(node: self.contentBackgroundNode, frame: CGRect(origin: CGPoint(), size: backgroundFrame.size))
-        transition.updateFrame(node: self.wrappingScrollNode, frame: CGRect(origin: CGPoint(), size: layout.size))
+//
+//        let sideInset = floor((layout.size.width - contentSize.width) / 2.0)
+//        let contentFrame: CGRect
+//        if isTablet {
+//            contentFrame = CGRect(origin: CGPoint(x: sideInset, y: floor((layout.size.height - contentSize.height) / 2.0)), size: contentSize)
+//        } else {
+//            contentFrame = CGRect(origin: CGPoint(x: sideInset, y: layout.size.height - contentSize.height), size: contentSize)
+//        }
+////        let contentFrame = CGRect(origin: .zero, size: wrappingScrollNode)
+//        var backgroundFrame = contentFrame
+////        if !isTablet {
+////            backgroundFrame.size.height += 2000.0
+////        }
+//        if backgroundFrame.minY < contentFrame.minY {
+//            backgroundFrame.origin.y = contentFrame.minY
+//        }
+        
+        transition.updateFrame(node: self.backgroundNode, frame: self.bounds)
+        transition.updateFrame(node: self.contentBackgroundNode, frame: CGRect(origin: CGPoint(), size: self.bounds.size))
+        
+//        transition.updateFrame(node: self.backgroundNode, frame: backgroundFrame)
+//        transition.updateFrame(node: self.contentBackgroundNode, frame: CGRect(origin: CGPoint(), size: backgroundFrame.size))
+//        transition.updateFrame(node: self.wrappingScrollNode, frame: CGRect(origin: CGPoint(), size: layout.size))
+        transition.updateFrame(node: self.wrappingScrollNode, frame: self.bounds)
         transition.updateFrame(node: self.dimNode, frame: CGRect(origin: CGPoint(), size: layout.size))
         
-        let titleSize = self.titleNode.measure(CGSize(width: contentFrame.width, height: .greatestFiniteMagnitude))
-        let titleFrame = CGRect(origin: CGPoint(x: floor((contentFrame.width - titleSize.width) / 2.0), y: 20.0), size: titleSize)
+        let titleSize = self.titleNode.measure(CGSize(width: self.bounds.width, height: .greatestFiniteMagnitude))
+        let titleFrame = CGRect(origin: CGPoint(x: floor((self.bounds.width - titleSize.width) / 2.0), y: insets.top + 20.0), size: titleSize)
         transition.updateFrame(node: self.titleNode, frame: titleFrame)
                 
         var previewSize: CGSize
         var previewFrame: CGRect
-        let previewAspectRatio: CGFloat = 1.85
-        if isLandscape {
-            let previewHeight = contentFrame.height
-            previewSize = CGSize(width: min(contentFrame.width - layout.safeInsets.left - layout.safeInsets.right, ceil(previewHeight * previewAspectRatio)), height: previewHeight)
-            previewFrame = CGRect(origin: CGPoint(x: floorToScreenPixels((contentFrame.width - previewSize.width) / 2.0), y: 0.0), size: previewSize)
-        } else {
-            previewSize = CGSize(width: contentFrame.width, height: min(contentFrame.height, ceil(contentFrame.width * previewAspectRatio)))
-            previewFrame = CGRect(origin: CGPoint(), size: previewSize)
-        }
+//        let previewAspectRatio: CGFloat = 1.85
+//        if isLandscape {
+//            let previewHeight = contentFrame.height
+//            previewSize = CGSize(width: min(contentFrame.width - layout.safeInsets.left - layout.safeInsets.right, ceil(previewHeight * previewAspectRatio)), height: previewHeight)
+//            previewFrame = CGRect(origin: CGPoint(x: floorToScreenPixels((contentFrame.width - previewSize.width) / 2.0), y: 0.0), size: previewSize)
+//        } else {
+//            previewSize = CGSize(width: contentFrame.width, height: min(contentFrame.height, ceil(contentFrame.width * previewAspectRatio)))
+//            previewFrame = CGRect(origin: CGPoint(), size: previewSize)
+//        }
+        previewSize = bounds.size
         previewFrame = bounds
         transition.updateFrame(node: self.previewContainerNode, frame: previewFrame)
         transition.updateFrame(node: self.shimmerNode, frame: CGRect(origin: CGPoint(), size: previewFrame.size))
@@ -425,11 +426,11 @@ final class ModernCallPreviewableVideoNode: ViewControllerTracingNode, UIScrollV
         self.shimmerNode.updateAbsoluteRect(previewFrame, within: layout.size)
         
         let cancelButtonSize = self.cancelButton.measure(CGSize(width: (previewFrame.width - titleSize.width) / 2.0, height: .greatestFiniteMagnitude))
-        let cancelButtonFrame = CGRect(origin: CGPoint(x: previewFrame.minX + 17.0, y: 20.0), size: cancelButtonSize)
+        let cancelButtonFrame = CGRect(origin: CGPoint(x: previewFrame.minX + 17.0, y: insets.top + 20.0), size: cancelButtonSize)
         transition.updateFrame(node: self.cancelButton, frame: cancelButtonFrame)
         
-        self.cameraNode.frame =  CGRect(origin: CGPoint(), size: previewSize)
-        self.cameraNode.updateLayout(size: previewSize, layoutMode: isLandscape ? .fillHorizontal : .fillVertical, transition: .immediate)
+        self.videoNode.frame =  CGRect(origin: CGPoint(), size: previewSize)
+        self.videoNode.updateLayout(size: previewSize, layoutMode: isLandscape ? .fillHorizontal : .fillVertical, transition: .immediate)
       
         self.placeholderTextNode.attributedText = NSAttributedString(string: presentationData.strings.VoiceChat_VideoPreviewShareScreenInfo, font: Font.semibold(16.0), textColor: .white)
         self.placeholderIconNode.image = generateTintedImage(image: UIImage(bundleImageName: isTablet ? "Call/ScreenShareTablet" : "Call/ScreenSharePhone"), color: .white)
@@ -443,16 +444,85 @@ final class ModernCallPreviewableVideoNode: ViewControllerTracingNode, UIScrollV
         let buttonInset: CGFloat = 16.0
         let buttonMaxWidth: CGFloat = 360.0
         
-        let buttonWidth = min(buttonMaxWidth, contentFrame.width - buttonInset * 2.0)
+//        let buttonWidth = min(buttonMaxWidth, contentFrame.width - buttonInset * 2.0)
+        let buttonWidth = min(buttonMaxWidth, self.bounds.width - buttonInset * 2.0)
         let doneButtonHeight = self.doneButton.updateLayout(width: buttonWidth, transition: transition)
-        transition.updateFrame(node: self.doneButton, frame: CGRect(x: floorToScreenPixels((contentFrame.width - buttonWidth) / 2.0), y: previewFrame.maxY - doneButtonHeight - buttonInset, width: buttonWidth, height: doneButtonHeight))
+        transition.updateFrame(node: self.doneButton, frame: CGRect(x: floorToScreenPixels((self.bounds.width - buttonWidth) / 2.0), y: previewFrame.maxY - doneButtonHeight - max(layout.intrinsicInsets.bottom + 14.0, 16.0), width: buttonWidth, height: doneButtonHeight))
         self.broadcastPickerView?.frame = self.doneButton.frame
         
         let wheelFrame = CGRect(origin: CGPoint(x: 16.0 + previewFrame.minX, y: previewFrame.maxY - doneButtonHeight - buttonInset - 36.0 - 20.0), size: CGSize(width: previewFrame.width - 32.0, height: 36.0))
         self.wheelNode.updateLayout(size: wheelFrame.size, transition: transition)
         transition.updateFrame(node: self.wheelNode, frame: wheelFrame)
         
-        transition.updateFrame(node: self.contentContainerNode, frame: contentFrame)
+//        transition.updateFrame(node: self.contentContainerNode, frame: contentFrame)
+        transition.updateFrame(node: self.contentContainerNode, frame: self.wrappingScrollNode.bounds)
+    }
+    
+    var currentOrientation: PresentationCallVideoView.Orientation { videoNode.currentOrientation }
+    var currentAspect: CGFloat { videoNode.currentAspect }
+    
+    func animateRadialMask(from fromRect: CGRect, to toRect: CGRect, completion: @escaping () -> Void = {}) {
+        let maskLayer = CAShapeLayer()
+        maskLayer.frame = fromRect
+        
+        let path = CGMutablePath()
+        path.addEllipse(in: CGRect(origin: CGPoint(), size: fromRect.size))
+        maskLayer.path = path
+        
+        self.layer.mask = maskLayer
+        
+        let topLeft = CGPoint(x: 0.0, y: 0.0)
+        let topRight = CGPoint(x: self.bounds.width, y: 0.0)
+        let bottomLeft = CGPoint(x: 0.0, y: self.bounds.height)
+        let bottomRight = CGPoint(x: self.bounds.width, y: self.bounds.height)
+        
+        func distance(_ v1: CGPoint, _ v2: CGPoint) -> CGFloat {
+            let dx = v1.x - v2.x
+            let dy = v1.y - v2.y
+            return sqrt(dx * dx + dy * dy)
+        }
+        
+        var maxRadius = distance(toRect.center, topLeft)
+        maxRadius = max(maxRadius, distance(toRect.center, topRight))
+        maxRadius = max(maxRadius, distance(toRect.center, bottomLeft))
+        maxRadius = max(maxRadius, distance(toRect.center, bottomRight))
+        maxRadius = ceil(maxRadius)
+        
+        let targetFrame = CGRect(origin: CGPoint(x: toRect.center.x - maxRadius, y: toRect.center.y - maxRadius), size: CGSize(width: maxRadius * 2.0, height: maxRadius * 2.0))
+        
+        let transition: ContainedViewLayoutTransition = .animated(duration: 0.3, curve: .easeInOut)
+        transition.updatePosition(layer: maskLayer, position: targetFrame.center)
+        transition.updateTransformScale(layer: maskLayer, scale: maxRadius * 2.0 / fromRect.width, completion: { [weak self] _ in
+            self?.layer.mask = nil
+            completion()
+        })
+    }
+    
+    func updateLayout(size: CGSize, layoutMode: VideoNodeLayoutMode, transition: ContainedViewLayoutTransition) {
+        self.videoNode.updateLayout(size: size, layoutMode: layoutMode, transition: transition)
+        
+        if var layout = self.containerLayout?.0, let navigationBarHeight = self.containerLayout?.1 {
+            layout.size = size
+            self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: transition)
+        }
+    }
+    
+    func updateLayout(size: CGSize, cornerRadius: CGFloat, isOutgoing: Bool, deviceOrientation: UIDeviceOrientation, isCompactLayout: Bool, transition: ContainedViewLayoutTransition) {
+        self.videoNode.updateLayout(size: size, cornerRadius: cornerRadius, isOutgoing: isOutgoing, deviceOrientation: deviceOrientation, isCompactLayout: isCompactLayout, transition: transition)
+        
+        if var layout = self.containerLayout?.0, let navigationBarHeight = self.containerLayout?.1 {
+            layout.size = size
+            self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: transition)
+        }
+    }
+    
+    func updateIsBlurred(isBlurred: Bool, light: Bool = false, animated: Bool = true) {
+        self.videoNode.updateIsBlurred(isBlurred: isBlurred, light: light, animated: animated)
+    }
+    
+    private var hasScheduledUnblur = false
+    func flip(withBackground: Bool) {
+        self.videoNode.flip(withBackground: withBackground)
     }
 }
 
@@ -633,7 +703,7 @@ private class WheelControlNode: ASDisplayNode, UIGestureRecognizerDelegate {
     }
 }
 
-final class ModernCallVideoNode: ASDisplayNode, PreviewVideoNode {
+final class ModernCallVideoNode: ASDisplayNode, PreviewVideoNode, ModernCallVideoNodeProtocol {
     private let videoTransformContainer: ASDisplayNode
     private let videoView: PresentationCallVideoView
     
@@ -756,7 +826,7 @@ final class ModernCallVideoNode: ASDisplayNode, PreviewVideoNode {
         }
     }
     
-    func animateRadialMask(from fromRect: CGRect, to toRect: CGRect) {
+    func animateRadialMask(from fromRect: CGRect, to toRect: CGRect, completion: @escaping () -> Void = {}) {
         let maskLayer = CAShapeLayer()
         maskLayer.frame = fromRect
         
@@ -785,10 +855,11 @@ final class ModernCallVideoNode: ASDisplayNode, PreviewVideoNode {
         
         let targetFrame = CGRect(origin: CGPoint(x: toRect.center.x - maxRadius, y: toRect.center.y - maxRadius), size: CGSize(width: maxRadius * 2.0, height: maxRadius * 2.0))
         
-        let transition: ContainedViewLayoutTransition = .animated(duration: 3, curve: .easeInOut)
+        let transition: ContainedViewLayoutTransition = .animated(duration: 0.3, curve: .easeInOut)
         transition.updatePosition(layer: maskLayer, position: targetFrame.center)
         transition.updateTransformScale(layer: maskLayer, scale: maxRadius * 2.0 / fromRect.width, completion: { [weak self] _ in
             self?.layer.mask = nil
+            completion()
         })
     }
     
@@ -951,5 +1022,8 @@ final class ModernCallVideoNode: ASDisplayNode, PreviewVideoNode {
                 }
             }
         }
+    }
+    
+    func hideContentItems() {
     }
 }
