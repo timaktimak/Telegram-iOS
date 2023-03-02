@@ -41,8 +41,10 @@ private final class ModernCallActivityNode: ASDisplayNode {
 private final class ModernCallWeakNetworkNode: ASDisplayNode {
     
     let clipNode: ASDisplayNode
-    let effectView: UIVisualEffectView
     let textNode: ASTextNode
+    var effectView: UIVisualEffectView!
+    
+    private var isDark: Bool?
     
     private let inset = CGFloat(12.0)
     
@@ -50,10 +52,6 @@ private final class ModernCallWeakNetworkNode: ASDisplayNode {
         self.clipNode = ASDisplayNode()
         self.clipNode.clipsToBounds = true
         self.clipNode.layer.cornerRadius = 14.0
-        
-        self.effectView = UIVisualEffectView()
-        self.effectView.effect = UIBlurEffect(style: .light)
-        self.effectView.isUserInteractionEnabled = false
         
         self.textNode = ASTextNode()
         self.textNode.maximumNumberOfLines = 1
@@ -66,15 +64,25 @@ private final class ModernCallWeakNetworkNode: ASDisplayNode {
         super.init()
         
         self.addSubnode(self.clipNode)
-        self.clipNode.view.addSubview(self.effectView)
         self.clipNode.addSubnode(self.textNode)
     }
     
     override func didLoad() {
         super.didLoad()
         
+        self.effectView = UIVisualEffectView()
+        self.effectView.isUserInteractionEnabled = false
+        self.clipNode.view.insertSubview(self.effectView, at: 0)
+        
         if #available(iOS 13.0, *) {
             self.clipNode.layer.cornerCurve = .continuous
+        }
+        
+        if let isDark = self.isDark {
+            let effect = UIBlurEffect(style: isDark ? .dark : .light)
+            if self.effectView.effect != effect {
+                self.effectView.effect = effect
+            }
         }
     }
     
@@ -93,6 +101,27 @@ private final class ModernCallWeakNetworkNode: ASDisplayNode {
     func animateOut() {
         self.layer.animateScale(from: 1.0, to: 0.0, duration: 0.25, removeOnCompletion: false)
         self.layer.animateAlpha(from: CGFloat(self.layer.opacity), to: 0.0, duration: 0.25, removeOnCompletion: false)
+    }
+    
+    func set(isDark: Bool, animated: Bool) {
+        guard self.isDark != isDark else { return }
+        self.isDark = isDark
+        
+        guard isNodeLoaded else { return }
+        
+        let block: () -> Void = {
+            let effect = UIBlurEffect(style: isDark ? .dark : .light)
+            if self.effectView.effect != effect {
+                self.effectView.effect = effect
+            }
+        }
+        if animated {
+            UIView.animate(withDuration: 0.3) {
+                block()
+            }
+        } else {
+            block()
+        }
     }
 }
 
@@ -437,6 +466,10 @@ final class ModernCallControllerStatusNode: ASDisplayNode {
         self.weakNetworkNode.frame = CGRect(origin: CGPoint(x: floor((constrainedWidth - textWidth) / 2.0), y: self.statusContainerNode.frame.maxY + 12.0), size: CGSize(width: textWidth, height: 30.0))
         
         return titleLayout.size.height + spacing + statusLayout.size.height
+    }
+    
+    func set(isDark: Bool, animated: Bool) {
+        self.weakNetworkNode.set(isDark: isDark, animated: animated)
     }
 }
 

@@ -188,6 +188,10 @@ final class ModernCallControllerToastContainerNode: ASDisplayNode {
             return 0.0
         }
     }
+    
+    func set(isDark: Bool, animated: Bool) {
+        self.toastNodes[.mute]?.set(isDark: isDark, animated: animated)
+    }
 }
 
 private class ModernCallControllerToastItemNode: ASDisplayNode {
@@ -210,9 +214,10 @@ private class ModernCallControllerToastItemNode: ASDisplayNode {
     }
     
     let clipNode: ASDisplayNode
-    let effectView: UIVisualEffectView
-//    let iconNode: ASImageNode
     let textNode: ImmediateTextNode
+    var effectView: UIVisualEffectView!
+    
+    private var isDark: Bool?
     
     private(set) var currentContent: Content?
     private(set) var currentWidth: CGFloat?
@@ -221,11 +226,6 @@ private class ModernCallControllerToastItemNode: ASDisplayNode {
     override init() {
         self.clipNode = ASDisplayNode()
         self.clipNode.clipsToBounds = true
-        self.clipNode.layer.cornerRadius = 14.0
-        
-        self.effectView = UIVisualEffectView()
-        self.effectView.effect = UIBlurEffect(style: .light)
-        self.effectView.isUserInteractionEnabled = false
         
         self.textNode = ImmediateTextNode()
         self.textNode.maximumNumberOfLines = 1
@@ -235,16 +235,42 @@ private class ModernCallControllerToastItemNode: ASDisplayNode {
         super.init()
         
         self.addSubnode(self.clipNode)
-        self.clipNode.view.addSubview(self.effectView)
-//        self.clipNode.addSubnode(self.iconNode)
         self.clipNode.addSubnode(self.textNode)
     }
     
     override func didLoad() {
         super.didLoad()
         
+        self.effectView = UIVisualEffectView()
+        self.effectView.isUserInteractionEnabled = false
+        self.clipNode.view.insertSubview(self.effectView, at: 0)
+        
+        if let isDark = self.isDark {
+            self.effectView.effect = UIBlurEffect(style: isDark ? .dark : .light)
+        }
+        
+        self.clipNode.layer.cornerRadius = 14.0
         if #available(iOS 13.0, *) {
             self.clipNode.layer.cornerCurve = .continuous
+        }
+    }
+    
+    func set(isDark: Bool, animated: Bool) {
+        guard self.isDark != isDark else { return }
+        self.isDark = isDark
+        
+        if self.isNodeLoaded {
+            let block: () -> Void = {
+                let effect = UIBlurEffect(style: isDark ? .dark : .light)
+                self.effectView.effect = effect
+            }
+            if animated {
+                UIView.animate(withDuration: 0.3) {
+                    block()
+                }
+            } else {
+                block()
+            }
         }
     }
     

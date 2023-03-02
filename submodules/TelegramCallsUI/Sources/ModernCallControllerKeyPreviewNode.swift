@@ -13,8 +13,9 @@ final class ModernCallControllerKeyPreviewNode: ASDisplayNode {
     private let subtitleTextNode: ASTextNode
     private let okTextNode: ASTextNode
     
-    private let topBackground: ASDisplayNode
-    private let botBackground: ASDisplayNode
+    private var topBlur: UIVisualEffectView!
+    private var botBlur: UIVisualEffectView!
+    
     private let separator: ASDisplayNode
     private let dismiss: () -> Void
     
@@ -36,10 +37,6 @@ final class ModernCallControllerKeyPreviewNode: ASDisplayNode {
         self.okTextNode.attributedText = NSAttributedString(string: ok, font: Font.regular(20), textColor: UIColor.white)
         self.okTextNode.textAlignment = .center
         
-        self.topBackground = ASDisplayNode()
-        self.topBackground.clipsToBounds = false
-        self.botBackground = ASDisplayNode()
-        self.botBackground.clipsToBounds = false
         self.separator = ASDisplayNode()
         self.separator.backgroundColor = UIColor(rgb: 0x0, alpha: 0.75)
         
@@ -47,40 +44,57 @@ final class ModernCallControllerKeyPreviewNode: ASDisplayNode {
         
         super.init()
         self.displaysAsynchronously = false
-        self.addSubnode(self.topBackground)
-        self.addSubnode(self.botBackground)
         self.addSubnode(self.separator)
         self.addSubnode(self.titleTextNode)
         self.addSubnode(self.subtitleTextNode)
         self.addSubnode(self.okTextNode)
     }
+    
+    override func didLoad() {
+        super.didLoad()
+        
+        self.clipsToBounds = true
+        self.layer.cornerRadius = 20
+        if #available(iOS 13.0, *) {
+            self.layer.cornerCurve = .continuous
+        }
+        
+        self.topBlur = UIVisualEffectView()
+        self.view.insertSubview(self.topBlur, at: 0)
+        
+        self.botBlur = UIVisualEffectView()
+        self.view.insertSubview(self.botBlur, at: 1)
+        
+        if let isDark {
+            let effect = UIBlurEffect(style: isDark ? .dark : .light)
+            self.topBlur.effect = effect
+            self.botBlur.effect = effect
+        }
+        
+        self.view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.tapGesture(_:))))
+    }
+    
+    
     private var isDark: Bool?
     
     func set(isDark: Bool, animated: Bool) {
         guard self.isDark != isDark else { return }
         self.isDark = isDark
         
-        let color = isDark ? UIColor(rgb: 0x0, alpha: 0.5) : UIColor(rgb: 0xFFFFFF, alpha: 0.25)
-        if animated && !self.isHidden && self.alpha > 0.01 {
-            let animation = CABasicAnimation(keyPath: "backgroundColor")
-            animation.toValue = color.cgColor
-            animation.duration = 0.15
-            animation.isRemovedOnCompletion = false
-            animation.fillMode = .forwards
-            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            self.topBackground.layer.add(animation, forKey: "fillColorAnimation")
-            self.botBackground.layer.add(animation, forKey: "fillColorAnimation")
-            
-            self.separator.layer.animateAlpha(from: isDark ? 0.0 : 1.0, to: isDark ? 1.0 : 0.0, duration: 0.1, removeOnCompletion: false)
-        } else {
-            self.topBackground.backgroundColor = color
-            self.botBackground.backgroundColor = color
-            self.separator.layer.opacity = isDark ? 1.0 : 0.0
+        if self.isNodeLoaded {
+            let block: () -> Void = {
+                let effect = UIBlurEffect(style: isDark ? .dark : .light)
+                self.topBlur.effect = effect
+                self.botBlur.effect = effect
+            }
+            if animated {
+                UIView.animate(withDuration: 0.3) {
+                    block()
+                }
+            } else {
+                block()
+            }
         }
-        
-//        self.topBackground.backgroundColor =
-//        self.botBackground.backgroundColor = isDark ? UIColor(rgb: 0x0, alpha: 0.5) : UIColor(rgb: 0xFFFFFF, alpha: 0.25)
-//        self.separator.isHidden = !isDark
     }
     
     func updateLayout(size: CGSize) {
@@ -92,17 +106,6 @@ final class ModernCallControllerKeyPreviewNode: ASDisplayNode {
         self.okTextNode.frame = CGRect(x: 0, y: size.height - 40, width: size.width, height: 25)
     }
     
-    override func didLoad() {
-        super.didLoad()
-        
-        self.topBackground.cornerRadius = 20
-        self.topBackground.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        self.botBackground.cornerRadius = 20
-        self.botBackground.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
-        
-        self.view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.tapGesture(_:))))
-    }
-    
     @objc private func tapGesture(_ recognizer: UITapGestureRecognizer) {
         if case .ended = recognizer.state {
             self.dismiss()
@@ -112,8 +115,9 @@ final class ModernCallControllerKeyPreviewNode: ASDisplayNode {
     override func layout() {
         super.layout()
         let pixel = 1.0 / UIScreen.main.scale
-        self.topBackground.frame = CGRect(x: 0, y: 0, width: self.bounds.width, height: self.bounds.height - 56.0 - pixel)
         self.separator.frame = CGRect(x: 0, y: self.bounds.height - 56.0 - pixel, width: self.bounds.width, height: pixel)
-        self.botBackground.frame = CGRect(x: 0, y: self.bounds.height - 56.0, width: self.bounds.width, height: 56.0)
+        
+        self.topBlur.frame = CGRect(x: 0, y: 0, width: self.bounds.width, height: self.bounds.height - 56.0 - pixel)
+        self.botBlur.frame = CGRect(x: 0, y: self.bounds.height - 56.0, width: self.bounds.width, height: 56.0)
     }
 }

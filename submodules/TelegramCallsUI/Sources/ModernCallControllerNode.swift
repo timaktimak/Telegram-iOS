@@ -991,13 +991,13 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                     }
                     self.emojiTooltip.layer.add(tooltipAlpha, forKey: "tooltipAlpha")
                     
-                    let timer = SwiftSignalKit.Timer(timeout: 3.0, repeat: false, completion: { [weak self] in
-                        self?.hideTooltip()
-                        self?.hideEmojiTooltipTimer?.invalidate()
-                        self?.hideEmojiTooltipTimer = nil
-                    }, queue: Queue.mainQueue())
-                    timer.start()
-                    self.hideEmojiTooltipTimer = timer
+//                    let timer = SwiftSignalKit.Timer(timeout: 3.0, repeat: false, completion: { [weak self] in
+//                        self?.hideTooltip()
+//                        self?.hideEmojiTooltipTimer?.invalidate()
+//                        self?.hideEmojiTooltipTimer = nil
+//                    }, queue: Queue.mainQueue())
+//                    timer.start()
+//                    self.hideEmojiTooltipTimer = timer
                     
                     if let (layout, navigationBarHeight) = self.validLayout {
                         self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .immediate)
@@ -1012,7 +1012,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                     }
                 }, timestamp)
                 if case .active = callState.state {
-                    statusReception = reception
+                    statusReception = reception.map { _ in 1 }
                 }
         }
         if self.shouldStayHiddenUntilConnection {
@@ -1049,10 +1049,13 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 self.isShowingEndCallUI = true
                 let duration = 0.3
                 
-                let nodes: [ASDisplayNode] = [self.backButtonNode, self.backButtonArrowNode, self.keyButtonNode, self.emojiTooltip, self.toastNode]
+                let nodes: [ASDisplayNode?] = [self.backButtonNode, self.backButtonArrowNode, self.keyButtonNode, self.emojiTooltip, self.toastNode, self.keyPreview]
                 for node in nodes {
-                    node.layer.animateAlpha(from: CGFloat(node.layer.opacity), to: 0.0, duration: duration, removeOnCompletion: false)
+                    if let node {
+                        node.layer.animateAlpha(from: CGFloat(node.layer.opacity), to: 0.0, duration: duration, removeOnCompletion: false)
+                    }
                 }
+                // TODO: timur show avatar
             }
         default:
             break
@@ -1086,8 +1089,15 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         let hasIncomingVideoNode = self.incomingVideoNodeValue != nil && self.expandedVideoNode === self.incomingVideoNodeValue
         self.videoContainerNode.isPinchGestureEnabled = hasIncomingVideoNode
         
-        self.emojiTooltip.set(isDark: self.expandedVideoNode != nil, animated: true)
-        self.keyPreview?.set(isDark: self.expandedVideoNode != nil, animated: true)
+        self.commonUpdateUI()
+    }
+    
+    private func commonUpdateUI() {
+        let isDark = self.hasVideoNodes
+        self.emojiTooltip.set(isDark: isDark, animated: true)
+        self.keyPreview?.set(isDark: isDark, animated: true)
+        self.toastNode.set(isDark: isDark, animated: true)
+        self.statusNode.set(isDark: isDark, animated: true)
     }
     
     private var isShowingEndCallUI = false
@@ -1679,6 +1689,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 self.call.setRequestedVideoAspect(Float(requestedAspect))
             }
         }
+        
+        self.commonUpdateUI()
     }
     
     private func frameForKeyButtonNode() -> CGRect {
