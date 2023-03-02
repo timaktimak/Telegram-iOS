@@ -312,13 +312,13 @@ final class ModernCallControllerStatusNode: ASDisplayNode {
         
         let nameFont: UIFont
         let statusFont: UIFont
-        if constrainedWidth < 330.0 {
+//        if constrainedWidth < 330.0 {
             nameFont = compactNameFont
             statusFont = compactStatusFont
-        } else {
-            nameFont = regularNameFont
-            statusFont = regularStatusFont
-        }
+//        } else {
+//            nameFont = regularNameFont
+//            statusFont = regularStatusFont
+//        }
         
         var statusOffset: CGFloat = 0.0
         let statusText: String

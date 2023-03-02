@@ -1133,14 +1133,14 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     }
     
     private func updateDimVisibility(transition: ContainedViewLayoutTransition = .animated(duration: 0.3, curve: .easeInOut)) {
-        guard let callState = self.callState else {
-            return
-        }
-        
-        var visible = true
-        if case .active = callState.state, self.incomingVideoNodeValue != nil || self.outgoingVideoNodeValue != nil {
-            visible = false
-        }
+//        guard let callState = self.callState else {
+//            return
+//        }
+//
+//        var visible = true
+//        if case .active = callState.state, self.incomingVideoNodeValue != nil || self.outgoingVideoNodeValue != nil {
+//            visible = false
+//        }
         
 //        let currentVisible = self.dimNode.image == nil
 //        if visible != currentVisible {
@@ -1156,7 +1156,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //                self.dimNode.image = image
 //            }
 //        }
-        self.statusNode.setVisible(visible || self.keyPreviewNode != nil, transition: transition)
+//        self.statusNode.setVisible(visible || self.keyPreviewNode != nil, transition: transition)
     }
     
     private func maybeScheduleUIHidingForActiveVideoCall() {
@@ -1544,7 +1544,12 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         self.avatarNode.updateLayout(size: avatarSize, transition: transition)
         
         let statusHeight = self.statusNode.updateLayout(constrainedWidth: layout.size.width, transition: transition)
-        transition.updateFrame(node: self.statusNode, frame: CGRect(x: 0.0, y: avatarY + avatarSize.height + 40, width: layout.size.width, height: statusHeight))
+        
+        if self.hasVideoNodes {
+            transition.updateFrame(node: self.statusNode, frame: CGRect(x: 0.0, y: topOriginY + 50.0, width: layout.size.width, height: statusHeight))
+        } else {
+            transition.updateFrame(node: self.statusNode, frame: CGRect(x: 0.0, y: avatarY + avatarSize.height + 40, width: layout.size.width, height: statusHeight))
+        }
         transition.updateAlpha(node: self.statusNode, alpha: overlayAlpha)
         
         let fullscreenVideoFrame = containerFullScreenFrame
@@ -1936,9 +1941,9 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                             self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .animated(duration: 0.3, curve: .easeInOut))
                         }
                     }
-                } else {
-                    let point = recognizer.location(in: recognizer.view)
-                    if self.statusNode.frame.contains(point) {
+                } //else {
+//                    let point = recognizer.location(in: recognizer.view)
+//                    if self.statusNode.frame.contains(point) {
 //                        if self.easyDebugAccess {
 //                            self.presentDebugNode()
 //                        } else {
@@ -1959,8 +1964,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //                                self.presentDebugNode()
 //                            }
 //                        }
-                    }
-                }
+//                    }
+//                }
             }
         }
     }
