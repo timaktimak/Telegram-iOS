@@ -38,6 +38,64 @@ private final class ModernCallActivityNode: ASDisplayNode {
     }
 }
 
+private final class ModernCallWeakNetworkNode: ASDisplayNode {
+    
+    let clipNode: ASDisplayNode
+    let effectView: UIVisualEffectView
+    let textNode: ASTextNode
+    
+    private let inset = CGFloat(12.0)
+    
+    override init() {
+        self.clipNode = ASDisplayNode()
+        self.clipNode.clipsToBounds = true
+        self.clipNode.layer.cornerRadius = 14.0
+        
+        self.effectView = UIVisualEffectView()
+        self.effectView.effect = UIBlurEffect(style: .light)
+        self.effectView.isUserInteractionEnabled = false
+        
+        self.textNode = ASTextNode()
+        self.textNode.maximumNumberOfLines = 1
+        self.textNode.attributedText = NSAttributedString(string: "Weak network signal", font: Font.regular(16), textColor: UIColor.white)
+        self.textNode.verticalAlignment = .middle
+        self.textNode.textAlignment = .center
+        self.textNode.displaysAsynchronously = false
+        self.textNode.isUserInteractionEnabled = false
+        
+        super.init()
+        
+        self.addSubnode(self.clipNode)
+        self.clipNode.view.addSubview(self.effectView)
+        self.clipNode.addSubnode(self.textNode)
+    }
+    
+    override func didLoad() {
+        super.didLoad()
+        
+        if #available(iOS 13.0, *) {
+            self.clipNode.layer.cornerCurve = .continuous
+        }
+    }
+    
+    override func layout() {
+        super.layout()
+        self.clipNode.frame = self.bounds
+        self.effectView.frame = self.clipNode.bounds
+        self.textNode.frame = self.bounds.inset(by: UIEdgeInsets(top: 0, left: inset, bottom: 0, right: inset))
+    }
+    
+    func animateIn() {
+        self.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.25, removeOnCompletion: false)
+        self.layer.animateSpring(from: 0.01 as NSNumber, to: 1.0 as NSNumber, keyPath: "transform.scale", duration: 0.3, damping: 105.0)
+    }
+    
+    func animateOut() {
+        self.layer.animateScale(from: 1.0, to: 0.0, duration: 0.25, removeOnCompletion: false)
+        self.layer.animateAlpha(from: CGFloat(self.layer.opacity), to: 0.0, duration: 0.25, removeOnCompletion: false)
+    }
+}
+
 enum ModernCallStatus: Equatable {
     case text(string: String, loading: Bool)
     case timer((String, Bool) -> String, Double)
@@ -98,6 +156,7 @@ final class ModernCallControllerStatusNode: ASDisplayNode {
     
     private let activityNode: ModernCallActivityNode
     
+    private let weakNetworkNode: ModernCallWeakNetworkNode
     
     // Call Ended меняет title а не статус
     
@@ -143,6 +202,13 @@ final class ModernCallControllerStatusNode: ASDisplayNode {
                         let _ = self.updateLayout(constrainedWidth: validLayoutWidth, transition: .immediate)
                     }
                 }
+                
+                switch self.status {
+                case .text(_, true), .callEnded:
+                    self.weakNetworkNode.animateOut()
+                default:
+                    break
+                }
             }
         }
     }
@@ -164,6 +230,20 @@ final class ModernCallControllerStatusNode: ASDisplayNode {
                 if (oldValue == nil) != (self.reception != nil) {
                     if let validLayoutWidth = self.validLayoutWidth {
                         let _ = self.updateLayout(constrainedWidth: validLayoutWidth, transition: .immediate)
+                    }
+                }
+                
+                var statusActive = false
+                if case .timer = self.status {
+                    statusActive = true
+                }
+                let wasWeak = oldValue.map { $0 <= 1 } ?? false
+                let nowWeak = self.reception.map { $0 <= 1 } ?? false
+                if nowWeak != wasWeak {
+                    if nowWeak && statusActive {
+                        self.weakNetworkNode.animateIn()
+                    } else {
+                        self.weakNetworkNode.animateOut()
                     }
                 }
             }
@@ -197,12 +277,16 @@ final class ModernCallControllerStatusNode: ASDisplayNode {
         
         self.activityNode = ModernCallActivityNode()
         
+        self.weakNetworkNode = ModernCallWeakNetworkNode()
+        self.weakNetworkNode.layer.opacity = 0.0
+        
         super.init()
         
         self.isUserInteractionEnabled = false
         
         self.addSubnode(self.titleNode)
         self.addSubnode(self.statusContainerNode)
+        self.addSubnode(self.weakNetworkNode)
         self.statusContainerNode.addSubnode(self.statusNode)
         self.statusContainerNode.addSubnode(self.receptionNode)
         self.statusContainerNode.addSubnode(self.callEndedNode)
@@ -216,6 +300,7 @@ final class ModernCallControllerStatusNode: ASDisplayNode {
         self.statusTimer?.invalidate()
     }
     
+    // TODO: timur
     func setVisible(_ visible: Bool, transition: ContainedViewLayoutTransition) {
         let alpha: CGFloat = visible ? 1.0 : 0.0
         transition.updateAlpha(node: self.titleNode, alpha: alpha)
@@ -345,14 +430,11 @@ final class ModernCallControllerStatusNode: ASDisplayNode {
             }
         }
         
-//        self.logoNode.isHidden = !statusDisplayLogo
-//        if let image = self.logoNode.image, let firstLineRect = statusMeasureLayout.linesRects().first {
-//            let firstLineOffset = floor((statusMeasureLayout.size.width - firstLineRect.width) / 2.0)
-//            self.logoNode.frame = CGRect(origin: CGPoint(x: self.statusNode.frame.minX + firstLineOffset - image.size.width - 7.0, y: 5.0), size: image.size)
-//        }
-        
         self.titleActivateAreaNode.frame = self.titleNode.frame
         self.statusActivateAreaNode.frame = self.statusContainerNode.frame
+        
+        let textWidth = CGFloat(176.0)
+        self.weakNetworkNode.frame = CGRect(origin: CGPoint(x: floor((constrainedWidth - textWidth) / 2.0), y: self.statusContainerNode.frame.maxY + 12.0), size: CGSize(width: textWidth, height: 30.0))
         
         return titleLayout.size.height + spacing + statusLayout.size.height
     }
