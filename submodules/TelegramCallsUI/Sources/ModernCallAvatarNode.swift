@@ -61,7 +61,17 @@ final class ModernCallAvatarNode: ASDisplayNode {
                     self.layer.removeAnimation(forKey: "pulsing")
                 }
             case .end:
-                self.layer.removeAnimation(forKey: "pulsing")
+                let animation = CABasicAnimation(keyPath: "transform.scale")
+                animation.toValue = 1.0
+                animation.duration = 0.3
+                animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                animation.isRemovedOnCompletion = false
+                animation.fillMode = .forwards
+                animation.completion = { _ in
+                    self.layer.removeAnimation(forKey: "pulsing")
+                }
+                self.layer.add(animation, forKey: "end")
+                
                 self.voiceNode.stopAnimating()
             case nil:
                 break

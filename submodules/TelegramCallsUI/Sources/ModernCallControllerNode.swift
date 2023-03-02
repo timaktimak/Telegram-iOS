@@ -184,7 +184,9 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         self.backButtonArrowNode.displayWithoutProcessing = true
         self.backButtonArrowNode.displaysAsynchronously = false
         self.backButtonArrowNode.image = NavigationBarTheme.generateBackArrowImage(color: .white)
+        self.backButtonArrowNode.alpha = 0.0
         self.backButtonNode = HighlightableButtonNode()
+        self.backButtonNode.alpha = 0.0
         
         self.statusNode = ModernCallControllerStatusNode()
         
@@ -928,7 +930,32 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                     let keyTextSize = self.keyButtonNode.measure(CGSize(width: 200.0, height: 200.0))
                     self.keyButtonNode.frame = CGRect(origin: self.keyButtonNode.frame.origin, size: keyTextSize)
                     
-                    self.keyButtonNode.animateAppearance()
+                    let duration = 0.5
+                    let timingFunction = CAMediaTimingFunction(controlPoints: 0.3, 0.3, 0.0, 1.0)
+                    
+                    self.keyButtonNode.animateAppearance(duration: duration, timingFunction: timingFunction)
+                    
+                    for (i, node) in [self.backButtonArrowNode, self.backButtonNode].enumerated() {
+                        let positionAnimation = CABasicAnimation(keyPath: "transform.translation.x")
+                        positionAnimation.byValue = -(CGFloat(i) * 40.0 + 10.0)
+                        positionAnimation.toValue = 0.0
+                        positionAnimation.duration = duration
+                        positionAnimation.timingFunction = timingFunction
+                        node.layer.add(positionAnimation, forKey: "positionAnimation")
+                        
+                        let opacityAnimation = CABasicAnimation(keyPath: "opacity")
+                        opacityAnimation.fromValue = 0.0
+                        opacityAnimation.toValue = 1.0
+                        opacityAnimation.duration = duration
+                        opacityAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                        opacityAnimation.isRemovedOnCompletion = false
+                        opacityAnimation.fillMode = .forwards
+                        opacityAnimation.completion = { [weak self] _ in
+                            self?.backButtonNode.alpha = 1.0
+                            self?.backButtonArrowNode.alpha = 1.0
+                        }
+                        node.layer.add(opacityAnimation, forKey: "opacityAnimation")
+                    }
                     
                     if let (layout, navigationBarHeight) = self.validLayout {
                         self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .immediate)
@@ -983,6 +1010,19 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             }
         }
         
+        switch callState.state {
+        case .terminating, .terminated:
+            if !self.isShowingEndCallUI {
+                self.isShowingEndCallUI = true
+                let duration = 0.3
+                self.backButtonNode.layer.animateAlpha(from: CGFloat(self.backButtonNode.layer.opacity), to: 0.0, duration: duration, removeOnCompletion: false)
+                self.backButtonArrowNode.layer.animateAlpha(from: CGFloat(self.backButtonArrowNode.layer.opacity), to: 0.0, duration: duration, removeOnCompletion: false)
+                self.keyButtonNode.layer.animateAlpha(from: CGFloat(self.keyButtonNode.layer.opacity), to: 0.0, duration: duration, removeOnCompletion: false)
+            }
+        default:
+            break
+        }
+        
         if case let .terminated(_, _, reportRating) = callState.state {//, let callId = id {
             let presentRating = reportRating || self.forceReportRating
             if presentRating {
@@ -998,6 +1038,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //                rateView.layer.animateAlpha(from: 0, to: 1, duration: 3)
                 
                 let closeButton = ModernCallCloseButton()
+                closeButton.addTarget(self, action: #selector(closePressed), forControlEvents: .touchUpInside)
                 self.containerNode.addSubnode(closeButton)
 //                closeButton.frame = self.buttonsNode.frame
                 closeButton.frame = CGRect(x: 45, y: self.buttonsNode.frame.minY, width: self.bounds.width - 90, height: 50)
@@ -1009,6 +1050,13 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         
         let hasIncomingVideoNode = self.incomingVideoNodeValue != nil && self.expandedVideoNode === self.incomingVideoNodeValue
         self.videoContainerNode.isPinchGestureEnabled = hasIncomingVideoNode
+    }
+    
+    private var isShowingEndCallUI = false
+    
+    @objc private func closePressed() {
+        self.endCall?()
+        self.back?()
     }
     
     private func updateToastContent() {
@@ -1420,8 +1468,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         }
         transition.updateFrame(node: self.backButtonNode, frame: CGRect(origin: CGPoint(x: 29.0, y: topOriginY + 11.0), size: backSize))
         
-        transition.updateAlpha(node: self.backButtonArrowNode, alpha: overlayAlpha)
-        transition.updateAlpha(node: self.backButtonNode, alpha: overlayAlpha)
+//        transition.updateAlpha(node: self.backButtonArrowNode, alpha: overlayAlpha)
+//        transition.updateAlpha(node: self.backButtonNode, alpha: overlayAlpha)
         transition.updateAlpha(node: self.toastNode, alpha: toastAlpha)
         
         // TODO: timur
@@ -1607,7 +1655,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     }
     
     private func yForKeyButtonNodeInPreview() -> CGFloat {
-        return 132 + 20 + self.keyButtonNode.bounds.size.height / 2
+        return 132.0 + 20.0 + self.keyButtonNode.bounds.size.height / 2.0 // TODO: timur
     }
     
 //    private func keyPreviewPoint() -> CGPoint {
@@ -1632,20 +1680,27 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 ContainedViewLayoutTransition.immediate.updateTransformScale(node: keyPreview, scale: 0.1)
                 ContainedViewLayoutTransition.immediate.updateAlpha(node: keyPreview, alpha: 0.1)
                 
+                let duration = 0.25
                 
-                let t = ContainedViewLayoutTransition.animated(duration: 0.6, curve: .spring)
+                let t = ContainedViewLayoutTransition.animated(duration: duration, curve: .spring)
                 keyPreview.updateLayout(size: CGSize(width: validLayout.size.width - 90, height: 225))
                 
                 t.updateTransformScale(node: keyPreview, scale: 1)
                 t.updateAlpha(node: keyPreview, alpha: 1)
+//                
+//                ContainedViewLayoutTransition.immediate.updateTransformScale(node: keyPreview, scale: 0.1)
+//                let scaleAnimation = CABasicAnimation(keyPath: "transform.scale")
+//                scaleAnimation.toValue = 1.0
+//                scaleAnimation.duration = duration
+//                scaleAnimation.timingFunction = CAMediaTimingFunction(controlPoints: 0.0, 0.0, 0.9, 1.1)
+//                scaleAnimation.fillMode = .forwards
+//                scaleAnimation.isRemovedOnCompletion = false
+//                keyPreview.layer.add(scaleAnimation, forKey: "scaleAnimation")
                 
                 
-                let t2 = ContainedViewLayoutTransition.animated(duration: 0.4, curve: .easeInOut)
+                let t2 = ContainedViewLayoutTransition.animated(duration: duration - 0.1, curve: .easeInOut)
                 t2.updateAlpha(node: avatarNode, alpha: 0)
                 t2.updateTransformScale(node: avatarNode, scale: 0.5)
-                
-//                let t3 = ContainedViewLayoutTransition.animated(duration: 0.4, curve: .linear)
-//                t3.updatePosition(node: self.keyButtonNode, position: )
                 
                 let positionAnimation = CAKeyframeAnimation(keyPath: "position")
                 let path = UIBezierPath()
@@ -1655,31 +1710,34 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                                   controlPoint: CGPoint(x: self.keyButtonNode.position.x - 16.0,
                                                         y: y - 16.0))
                 positionAnimation.path = path.cgPath
-                positionAnimation.duration = 0.4
+                positionAnimation.duration = duration
                 positionAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 positionAnimation.fillMode = .forwards
                 positionAnimation.isRemovedOnCompletion = false
                 self.keyButtonNode.layer.add(positionAnimation, forKey: "positionAnimation")
                 
                 
-                self.keyButtonNode.animatedSpread(duration: 0.4)
+                self.keyButtonNode.animateSpread(duration: duration)
             }
         }
     }
     
     private func dismiss() {
+        
         if let keyPreview = self.keyPreview { // TODO: timur reversable?
-            let t = ContainedViewLayoutTransition.animated(duration: 0.6, curve: .spring)
-            t.updateAlpha(node: keyPreview, alpha: 0, beginWithCurrentState: true)
+            let duration = 0.25
+            
+            let t = ContainedViewLayoutTransition.animated(duration: duration, curve: .spring)
+            t.updateAlpha(node: keyPreview, alpha: 0.0, beginWithCurrentState: true)
             t.updateTransformScale(node: keyPreview, scale: 0.1, beginWithCurrentState: true, completion: { [weak self] _ in
                 keyPreview.removeFromSupernode()
                 self?.keyPreview = nil
                 self?.keyButtonNode.isUserInteractionEnabled = true
             })
             
-            let t2 = ContainedViewLayoutTransition.animated(duration: 0.4, curve: .easeInOut)
-            t2.updateAlpha(node: self.avatarNode, alpha: 1, beginWithCurrentState: true)
-            t2.updateTransformScale(node: self.avatarNode, scale: 1, beginWithCurrentState: true)
+            let t2 = ContainedViewLayoutTransition.animated(duration: duration - 0.1, curve: .easeInOut)
+            t2.updateAlpha(node: self.avatarNode, alpha: 1.0, beginWithCurrentState: true)
+            t2.updateTransformScale(node: self.avatarNode, scale: 1.0, beginWithCurrentState: true)
             
             let fr = frameForKeyButtonNode()
             let position = CGPoint(x: fr.minX + fr.width / 2.0, y: fr.minY + fr.height / 2.0)
@@ -1693,11 +1751,13 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                               controlPoint: CGPoint(x: position.x - 16.0,
                                                     y: y - 16.0))
             positionAnimation.path = path.cgPath
-            positionAnimation.duration = 0.4
+            positionAnimation.duration = duration
             positionAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             positionAnimation.fillMode = .forwards
             positionAnimation.isRemovedOnCompletion = false
             self.keyButtonNode.layer.add(positionAnimation, forKey: "positionAnimation")
+            
+            self.keyButtonNode.animateShrink(duration: duration)
             
             
         }

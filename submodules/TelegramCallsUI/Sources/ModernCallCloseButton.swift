@@ -210,7 +210,7 @@ private final class Stripe: ActionlessShapeLayer {
     }
 }
 
-final class ModernCallCloseButton: ASDisplayNode {
+final class ModernCallCloseButton: ASControlNode {
     
     private var center: CloseImageLayer!
     
