@@ -70,6 +70,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     private var hiddenUIForActiveVideoCallOnce: Bool = false
     private var hideUIForActiveVideoCallTimer: SwiftSignalKit.Timer?
     
+    private var hideEmojiTooltipTimer: SwiftSignalKit.Timer?
+    
     private var displayedCameraConfirmation: Bool = false
     private var displayedCameraTooltip: Bool = false
         
@@ -994,13 +996,21 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                     tooltipAlpha.toValue = 1.0
                     tooltipAlpha.duration = tooltipDuration
                     tooltipAlpha.beginTime = currentTime + duration - 0.2
-                    tooltipScale.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                    tooltipAlpha.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                     tooltipAlpha.isRemovedOnCompletion = false
                     tooltipAlpha.fillMode = .forwards
                     tooltipAlpha.completion = { _ in
                         self.emojiTooltip.alpha = 1.0
                     }
                     self.emojiTooltip.layer.add(tooltipAlpha, forKey: "tooltipAlpha")
+                    
+                    let timer = SwiftSignalKit.Timer(timeout: 3.0, repeat: false, completion: { [weak self] in
+                        self?.hideTooltip()
+                        self?.hideEmojiTooltipTimer?.invalidate()
+                        self?.hideEmojiTooltipTimer = nil
+                    }, queue: Queue.mainQueue())
+                    timer.start()
+                    self.hideEmojiTooltipTimer = timer
                     
                     if let (layout, navigationBarHeight) = self.validLayout {
                         self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .immediate)
