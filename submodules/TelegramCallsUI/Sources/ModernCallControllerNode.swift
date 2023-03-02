@@ -86,8 +86,9 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     private let buttonsNode: ModernCallControllerButtonsNode
     private var keyPreviewNode: CallControllerKeyPreviewNode?
     private var keyPreview: ModernCallControllerKeyPreviewNode?
+    private let emojiTooltip: ModernCallEmojiTooltip
     
-    private var debugNode: CallDebugNode?
+//    private var debugNode: CallDebugNode?
     
     private var keyTextData: (Data, String)?
     private let keyButtonNode: ModernCallControllerKeyButton
@@ -195,7 +196,11 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         self.keyButtonNode = ModernCallControllerKeyButton()
         self.keyButtonNode.accessibilityElementsHidden = false
         
+        self.emojiTooltip = ModernCallEmojiTooltip()
+        self.emojiTooltip.alpha = 0
+        
         super.init()
+        
         
         self.containerNode.backgroundColor = .black
         
@@ -231,6 +236,10 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         self.containerNode.addSubnode(self.buttonsNode)
         self.containerNode.addSubnode(self.toastNode)
         self.containerNode.addSubnode(self.keyButtonNode)
+        // TODO: timur remove?
+        if easyDebugAccess || !UserDefaults.standard.bool(forKey: "emoji-tooltip-pressed") {
+            self.containerNode.addSubnode(self.emojiTooltip)
+        }
         self.containerNode.addSubnode(self.backButtonArrowNode)
         self.containerNode.addSubnode(self.backButtonNode)
         
@@ -470,7 +479,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         }
         
         self.keyButtonNode.addTarget(self, action: #selector(self.keyPressed), forControlEvents: .touchUpInside)
-        
+        self.emojiTooltip.addTarget(self, action: #selector(self.tooltipPressed), forControlEvents: .touchUpInside)
         self.backButtonNode.addTarget(self, action: #selector(self.backPressed), forControlEvents: .touchUpInside)
         
         if shouldStayHiddenUntilConnection {
@@ -957,6 +966,40 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                         node.layer.add(opacityAnimation, forKey: "opacityAnimation")
                     }
                     
+                    self.emojiTooltip.anchorPoint = CGPoint(x: 0.7, y: 0.0)
+                    
+                    let emojiToolTipHeight = CGFloat(38.0)
+                    let emojiToolTipWidth = CGFloat(225.0)
+                    ContainedViewLayoutTransition.immediate.updateFrame(node: self.emojiTooltip, frame: CGRect(x: self.bounds.width - 15 - emojiToolTipWidth, y: self.keyButtonNode.frame.maxY + 13.0, width: emojiToolTipWidth, height: emojiToolTipHeight))
+                    ContainedViewLayoutTransition.immediate.updateTransformScale(node: self.emojiTooltip, scale: 0.1)
+                    
+                    let tooltipDuration = 0.3
+                    let currentTime = CACurrentMediaTime()
+                    
+                    let tooltipScale = CABasicAnimation(keyPath: "transform.scale")
+                    tooltipScale.toValue = 1.0
+                    tooltipScale.duration = tooltipDuration
+                    tooltipScale.beginTime = currentTime + duration - 0.2
+                    tooltipScale.timingFunction = CAMediaTimingFunction(controlPoints: 0.0, 0.5, 0.6, 1.2)
+                    tooltipScale.isRemovedOnCompletion = false
+                    tooltipScale.fillMode = .forwards
+                    tooltipScale.completion = { _ in
+                        ContainedViewLayoutTransition.immediate.updateTransformScale(node: self.emojiTooltip, scale: 1.0)
+                    }
+                    self.emojiTooltip.layer.add(tooltipScale, forKey: "tooltipScale")
+                    
+                    let tooltipAlpha = CABasicAnimation(keyPath: "opacity")
+                    tooltipAlpha.toValue = 1.0
+                    tooltipAlpha.duration = tooltipDuration
+                    tooltipAlpha.beginTime = currentTime + duration - 0.2
+                    tooltipScale.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                    tooltipAlpha.isRemovedOnCompletion = false
+                    tooltipAlpha.fillMode = .forwards
+                    tooltipAlpha.completion = { _ in
+                        self.emojiTooltip.alpha = 1.0
+                    }
+                    self.emojiTooltip.layer.add(tooltipAlpha, forKey: "tooltipAlpha")
+                    
                     if let (layout, navigationBarHeight) = self.validLayout {
                         self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .immediate)
                     }
@@ -1015,9 +1058,11 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             if !self.isShowingEndCallUI {
                 self.isShowingEndCallUI = true
                 let duration = 0.3
-                self.backButtonNode.layer.animateAlpha(from: CGFloat(self.backButtonNode.layer.opacity), to: 0.0, duration: duration, removeOnCompletion: false)
-                self.backButtonArrowNode.layer.animateAlpha(from: CGFloat(self.backButtonArrowNode.layer.opacity), to: 0.0, duration: duration, removeOnCompletion: false)
-                self.keyButtonNode.layer.animateAlpha(from: CGFloat(self.keyButtonNode.layer.opacity), to: 0.0, duration: duration, removeOnCompletion: false)
+                
+                let nodes: [ASDisplayNode] = [self.backButtonNode, self.backButtonArrowNode, self.keyButtonNode, self.emojiTooltip]
+                for node in nodes {
+                    node.layer.animateAlpha(from: CGFloat(self.backButtonNode.layer.opacity), to: 0.0, duration: duration, removeOnCompletion: false)
+                }
             }
         default:
             break
@@ -1592,9 +1637,9 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             transition.updateAlpha(node: self.keyButtonNode, alpha: overlayAlpha)
         }
         
-        if let debugNode = self.debugNode {
-            transition.updateFrame(node: debugNode, frame: CGRect(origin: CGPoint(), size: layout.size))
-        }
+//        if let debugNode = self.debugNode {
+//            transition.updateFrame(node: debugNode, frame: CGRect(origin: CGPoint(), size: layout.size))
+//        }
         
         let requestedAspect: CGFloat
         if case .compact = layout.metrics.widthClass, case .compact = layout.metrics.heightClass {
@@ -1651,7 +1696,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         let navigationOffset: CGFloat = max(20.0, self.validLayout!.0.safeInsets.top)
         let topOriginY = interpolate(from: -20.0, to: navigationOffset, value: uiDisplayTransition)
         
-        return CGRect(origin: CGPoint(x: self.validLayout!.0.size.width - keyTextSize.width - 8.0, y: topOriginY + 8.0), size: keyTextSize)
+        return CGRect(origin: CGPoint(x: self.validLayout!.0.size.width - keyTextSize.width - 10.0, y: topOriginY + 8.0), size: keyTextSize)
     }
     
     private func yForKeyButtonNodeInPreview() -> CGFloat {
@@ -1662,7 +1707,38 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //        return CGPoint(x: validLayout!.size.width - 45, y: 132)
 //    }
     
+    @objc func tooltipPressed() {
+        UserDefaults.standard.setValue(true, forKey: "emoji-tooltip-pressed")
+        hideTooltip()
+    }
+    
+    private func hideTooltip() {
+        // TODO: timur user defaults
+        let duration = 0.2
+        
+        let tooltipScale = CABasicAnimation(keyPath: "transform.scale")
+        tooltipScale.toValue = 0.0
+        tooltipScale.duration = duration
+        tooltipScale.isRemovedOnCompletion = false
+        tooltipScale.fillMode = .forwards
+        tooltipScale.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        self.emojiTooltip.layer.add(tooltipScale, forKey: "tooltipScaleDisappear")
+        
+        let tooltipAlpha = CABasicAnimation(keyPath: "opacity")
+        tooltipAlpha.fromValue = self.emojiTooltip.layer.opacity
+        tooltipAlpha.toValue = 0.0
+        tooltipAlpha.duration = duration
+        tooltipAlpha.isRemovedOnCompletion = false
+        tooltipAlpha.fillMode = .forwards
+        tooltipAlpha.completion = { _ in
+            self.emojiTooltip.removeFromSupernode()
+        }
+        self.emojiTooltip.layer.add(tooltipAlpha, forKey: "tooltipAlphaDisappear")
+    }
+    
     @objc func keyPressed() {
+        self.hideTooltip()
+        
         if self.keyPreview == nil {//}, let keyText = self.keyTextData?.1 {//}, let peer = self.peer {
             let keyPreview = ModernCallControllerKeyPreviewNode(title: "This call is end-to-end encrypted", subtitle: "If the emoji on Emma's screen are the same, this call is 100% secure.", ok: "OK", dismiss: { [weak self] in
                 self?.dismiss()
@@ -1807,7 +1883,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         return self.expandedVideoNode != nil || self.minimizedVideoNode != nil
     }
     
-    private var debugTapCounter: (Double, Int) = (0.0, 0)
+//    private var debugTapCounter: (Double, Int) = (0.0, 0)
     
     private func areUserActionsDisabledNow() -> Bool {
         return CACurrentMediaTime() < self.disableActionsUntilTimestamp
@@ -1862,53 +1938,53 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 } else {
                     let point = recognizer.location(in: recognizer.view)
                     if self.statusNode.frame.contains(point) {
-                        if self.easyDebugAccess {
-                            self.presentDebugNode()
-                        } else {
-                            let timestamp = CACurrentMediaTime()
-                            if self.debugTapCounter.0 < timestamp - 0.75 {
-                                self.debugTapCounter.0 = timestamp
-                                self.debugTapCounter.1 = 0
-                            }
-                            
-                            if self.debugTapCounter.0 >= timestamp - 0.75 {
-                                self.debugTapCounter.0 = timestamp
-                                self.debugTapCounter.1 += 1
-                            }
-                            
-                            if self.debugTapCounter.1 >= 10 {
-                                self.debugTapCounter.1 = 0
-                                
-                                self.presentDebugNode()
-                            }
-                        }
+//                        if self.easyDebugAccess {
+//                            self.presentDebugNode()
+//                        } else {
+//                            let timestamp = CACurrentMediaTime()
+//                            if self.debugTapCounter.0 < timestamp - 0.75 {
+//                                self.debugTapCounter.0 = timestamp
+//                                self.debugTapCounter.1 = 0
+//                            }
+//
+//                            if self.debugTapCounter.0 >= timestamp - 0.75 {
+//                                self.debugTapCounter.0 = timestamp
+//                                self.debugTapCounter.1 += 1
+//                            }
+//
+//                            if self.debugTapCounter.1 >= 10 {
+//                                self.debugTapCounter.1 = 0
+//
+//                                self.presentDebugNode()
+//                            }
+//                        }
                     }
                 }
             }
         }
     }
     
-    private func presentDebugNode() {
-        guard self.debugNode == nil else {
-            return
-        }
-        
-        self.forceReportRating = true
-        
-        let debugNode = CallDebugNode(signal: self.debugInfo)
-        debugNode.dismiss = { [weak self] in
-            if let strongSelf = self {
-                strongSelf.debugNode?.removeFromSupernode()
-                strongSelf.debugNode = nil
-            }
-        }
-        self.addSubnode(debugNode)
-        self.debugNode = debugNode
-        
-        if let (layout, navigationBarHeight) = self.validLayout {
-            self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .immediate)
-        }
-    }
+//    private func presentDebugNode() {
+//        guard self.debugNode == nil else {
+//            return
+//        }
+//
+//        self.forceReportRating = true
+//
+//        let debugNode = CallDebugNode(signal: self.debugInfo)
+//        debugNode.dismiss = { [weak self] in
+//            if let strongSelf = self {
+//                strongSelf.debugNode?.removeFromSupernode()
+//                strongSelf.debugNode = nil
+//            }
+//        }
+//        self.addSubnode(debugNode)
+//        self.debugNode = debugNode
+//
+//        if let (layout, navigationBarHeight) = self.validLayout {
+//            self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .immediate)
+//        }
+//    }
     
     private var minimizedVideoInitialPosition: CGPoint?
     private var minimizedVideoDraggingPosition: CGPoint?
@@ -2150,9 +2226,9 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     }
     
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        if self.debugNode != nil {
-            return super.hitTest(point, with: event)
-        }
+//        if self.debugNode != nil {
+//            return super.hitTest(point, with: event)
+//        }
         if self.containerTransformationNode.frame.contains(point) {
             return self.containerTransformationNode.view.hitTest(self.view.convert(point, to: self.containerTransformationNode.view), with: event)
         }
