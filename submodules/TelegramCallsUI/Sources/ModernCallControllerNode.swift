@@ -966,6 +966,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                         node.layer.add(opacityAnimation, forKey: "opacityAnimation")
                     }
                     
+                    self.emojiTooltip.set(isDark: self.call.isVideo, animated: false)
+                    
                     self.emojiTooltip.anchorPoint = CGPoint(x: 0.7, y: 0.0)
                     
                     let emojiToolTipHeight = CGFloat(38.0)
@@ -1095,6 +1097,9 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         
         let hasIncomingVideoNode = self.incomingVideoNodeValue != nil && self.expandedVideoNode === self.incomingVideoNodeValue
         self.videoContainerNode.isPinchGestureEnabled = hasIncomingVideoNode
+        
+        self.emojiTooltip.set(isDark: self.expandedVideoNode != nil, animated: true)
+        self.keyPreview?.set(isDark: self.expandedVideoNode != nil, animated: true)
     }
     
     private var isShowingEndCallUI = false
@@ -1492,10 +1497,10 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //        transition.updateAlpha(node: self.dimNode, alpha: pinchTransitionAlpha)
 //        transition.updateFrame(node: self.dimNode, frame: containerFullScreenFrame)
         
-        if let keyPreviewNode = self.keyPreviewNode {
-            transition.updateFrame(node: keyPreviewNode, frame: containerFullScreenFrame)
-            keyPreviewNode.updateLayout(size: layout.size, transition: .immediate)
-        }
+//        if let keyPreviewNode = self.keyPreviewNode {
+//            transition.updateFrame(node: keyPreviewNode, frame: containerFullScreenFrame)
+//            keyPreviewNode.updateLayout(size: layout.size, transition: .immediate)
+//        }
         
         transition.updateFrame(node: self.backgroundNode, frame: containerFullScreenFrame)
         self.backgroundNode.updateLayout(size: self.backgroundNode.bounds.size, transition: transition)
@@ -1743,7 +1748,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             let keyPreview = ModernCallControllerKeyPreviewNode(title: "This call is end-to-end encrypted", subtitle: "If the emoji on Emma's screen are the same, this call is 100% secure.", ok: "OK", dismiss: { [weak self] in
                 self?.dismiss()
             })
-            keyPreview.set(isDark: self.callState?.remoteVideoState == .active)
+            keyPreview.set(isDark: self.callState?.remoteVideoState == .active, animated: false)
             
             self.containerNode.insertSubnode(keyPreview, belowSubnode: self.keyButtonNode)
             self.keyButtonNode.isUserInteractionEnabled = false
@@ -1862,14 +1867,18 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //    }
     
     @objc func backPressed() {
-        if let keyPreviewNode = self.keyPreviewNode {
-            self.keyPreviewNode = nil
-            keyPreviewNode.animateOut(to: self.keyButtonNode.frame, toNode: self.keyButtonNode, completion: { [weak self, weak keyPreviewNode] in
-                self?.keyButtonNode.isHidden = false
-                keyPreviewNode?.removeFromSupernode()
-            })
-            self.updateDimVisibility()
-        } else if self.hasVideoNodes {
+        if self.keyPreview != nil {
+            self.dismiss()
+        }
+//        if let keyPreviewNode = self.keyPreviewNode {
+//            self.keyPreviewNode = nil
+//            keyPreviewNode.animateOut(to: self.keyButtonNode.frame, toNode: self.keyButtonNode, completion: { [weak self, weak keyPreviewNode] in
+//                self?.keyButtonNode.isHidden = false
+//                keyPreviewNode?.removeFromSupernode()
+//            })
+//            self.updateDimVisibility()
+//        }
+        else if self.hasVideoNodes {
             if let (layout, navigationHeight) = self.validLayout {
                 self.pictureInPictureTransitionFraction = 1.0
                 self.containerLayoutUpdated(layout, navigationBarHeight: navigationHeight, transition: .animated(duration: 0.4, curve: .spring))

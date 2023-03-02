@@ -41,6 +41,7 @@ final class ModernCallControllerKeyPreviewNode: ASDisplayNode {
         self.botBackground = ASDisplayNode()
         self.botBackground.clipsToBounds = false
         self.separator = ASDisplayNode()
+        self.separator.backgroundColor = UIColor(rgb: 0x0, alpha: 0.75)
         
         self.dismiss = dismiss
         
@@ -53,12 +54,33 @@ final class ModernCallControllerKeyPreviewNode: ASDisplayNode {
         self.addSubnode(self.subtitleTextNode)
         self.addSubnode(self.okTextNode)
     }
+    private var isDark: Bool?
     
-    func set(isDark: Bool) {
-        self.topBackground.backgroundColor = isDark ? UIColor(rgb: 0x0, alpha: 0.5) : UIColor(rgb: 0xFFFFFF, alpha: 0.25)
-        self.botBackground.backgroundColor = isDark ? UIColor(rgb: 0x0, alpha: 0.5) : UIColor(rgb: 0xFFFFFF, alpha: 0.25)
-        self.separator.backgroundColor = UIColor(rgb: 0x0, alpha: 0.75)
-        self.separator.isHidden = !isDark
+    func set(isDark: Bool, animated: Bool) {
+        guard self.isDark != isDark else { return }
+        self.isDark = isDark
+        
+        let color = isDark ? UIColor(rgb: 0x0, alpha: 0.5) : UIColor(rgb: 0xFFFFFF, alpha: 0.25)
+        if animated && !self.isHidden && self.alpha > 0.01 {
+            let animation = CABasicAnimation(keyPath: "backgroundColor")
+            animation.toValue = color.cgColor
+            animation.duration = 0.15
+            animation.isRemovedOnCompletion = false
+            animation.fillMode = .forwards
+            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            self.topBackground.layer.add(animation, forKey: "fillColorAnimation")
+            self.botBackground.layer.add(animation, forKey: "fillColorAnimation")
+            
+            self.separator.layer.animateAlpha(from: isDark ? 0.0 : 1.0, to: isDark ? 1.0 : 0.0, duration: 0.1, removeOnCompletion: false)
+        } else {
+            self.topBackground.backgroundColor = color
+            self.botBackground.backgroundColor = color
+            self.separator.layer.opacity = isDark ? 1.0 : 0.0
+        }
+        
+//        self.topBackground.backgroundColor =
+//        self.botBackground.backgroundColor = isDark ? UIColor(rgb: 0x0, alpha: 0.5) : UIColor(rgb: 0xFFFFFF, alpha: 0.25)
+//        self.separator.isHidden = !isDark
     }
     
     func updateLayout(size: CGSize) {

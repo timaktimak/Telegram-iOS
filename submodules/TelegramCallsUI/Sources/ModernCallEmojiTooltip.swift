@@ -35,14 +35,43 @@ final class ModernCallEmojiTooltip: ASControlNode {
     override func didLoad() {
         super.didLoad()
         self.notch = ActionlessShapeLayer()
-        self.layer.addSublayer(self.notch)
-        self.notch.fillColor = UIColor.white.withAlphaComponent(0.25).cgColor
+        self.layer.insertSublayer(self.notch, at: 0)
+//        self.notch.fillColor = UIColor.white.withAlphaComponent(0.25).cgColor
 //        self.notch.backgroundColor = UIColor.red.cgColor
         
         self.background = ActionlessShapeLayer()
-        self.layer.addSublayer(self.background)
-        self.background.fillColor = UIColor.white.withAlphaComponent(0.25).cgColor
+        self.layer.insertSublayer(self.background, at: 0)
+//        self.background.fillColor = UIColor.white.withAlphaComponent(0.25).cgColor
+    }
+    
+    private var isDark: Bool?
+    
+    func set(isDark: Bool, animated: Bool) {
+        guard self.isDark != isDark else { return }
+        self.isDark = isDark
         
+        let color = isDark ? UIColor.black.withAlphaComponent(0.5).cgColor : UIColor.white.withAlphaComponent(0.25).cgColor
+        if animated && !self.isHidden && self.alpha > 0.01 {
+            let animation = CABasicAnimation(keyPath: "fillColor")
+            animation.toValue = color
+            animation.duration = 0.15
+            animation.isRemovedOnCompletion = false
+            animation.fillMode = .forwards
+            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            
+//            animation.completion = { _ in
+//                self.notch.fillColor = color
+//            }
+            self.notch.add(animation, forKey: "fillColorAnimation")
+            
+//            animation.completion = { _ in
+//                self.background.fillColor = color
+//            }
+            self.background.add(animation, forKey: "fillColorAnimation")
+        } else {
+            self.notch.fillColor = color
+            self.background.fillColor = color
+        }
     }
     
     override func layout() {
