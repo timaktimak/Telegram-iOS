@@ -73,7 +73,6 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     private var hideEmojiTooltipTimer: SwiftSignalKit.Timer?
     
     private var displayedCameraConfirmation: Bool = false
-    private var displayedCameraTooltip: Bool = false
         
     private var expandedVideoNode: (ModernCallVideoNodeProtocol & ASDisplayNode)?
     private var minimizedVideoNode: (ModernCallVideoNodeProtocol & ASDisplayNode)?
@@ -84,7 +83,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     private let backButtonArrowNode: ASImageNode
     private let backButtonNode: HighlightableButtonNode
     private let statusNode: ModernCallControllerStatusNode
-    private let toastNode: CallControllerToastContainerNode
+    private let toastNode: ModernCallControllerToastContainerNode
     private let buttonsNode: ModernCallControllerButtonsNode
     private var keyPreviewNode: CallControllerKeyPreviewNode?
     private var keyPreview: ModernCallControllerKeyPreviewNode?
@@ -127,8 +126,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     var present: ((ViewController) -> Void)?
     var dismissAllTooltips: (() -> Void)?
     
-    private var toastContent: CallControllerToastContent?
-    private var displayToastsAfterTimestamp: Double?
+    private var toastContent: ModernCallControllerToastContent?
+//    private var displayToastsAfterTimestamp: Double?
     
     private var buttonsMode: CallControllerButtonsMode?
     
@@ -194,7 +193,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         self.statusNode = ModernCallControllerStatusNode()
         
         self.buttonsNode = ModernCallControllerButtonsNode(strings: self.presentationData.strings)
-        self.toastNode = CallControllerToastContainerNode(strings: self.presentationData.strings)
+        self.toastNode = ModernCallControllerToastContainerNode(strings: self.presentationData.strings)
         self.keyButtonNode = ModernCallControllerKeyButton()
         self.keyButtonNode.accessibilityElementsHidden = false
         
@@ -550,18 +549,6 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         if let orientationDidChangeObserver = self.orientationDidChangeObserver {
             NotificationCenter.default.removeObserver(orientationDidChangeObserver)
         }
-    }
-    
-    func displayCameraTooltip() {
-        guard self.pictureInPictureTransitionFraction.isZero, let location = self.buttonsNode.videoButtonFrame().flatMap({ frame -> CGRect in
-            return self.buttonsNode.view.convert(frame, to: self.view)
-        }) else {
-            return
-        }
-                
-        self.present?(TooltipScreen(account: self.account, text: self.presentationData.strings.Call_CameraOrScreenTooltip, style: .light, icon: nil, location: .point(location.offsetBy(dx: 0.0, dy: -14.0), .bottom), displayDuration: .custom(5.0), shouldDismissOnTouch: { _ in
-            return .dismiss(consume: false)
-        }))
     }
     
     override func didLoad() {
@@ -1053,16 +1040,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         self.updateDimVisibility()
         
         if self.incomingVideoViewRequested || self.outgoingVideoViewRequested {
-            if self.incomingVideoViewRequested && self.outgoingVideoViewRequested {
-                self.displayedCameraTooltip = true
-            }
             self.displayedCameraConfirmation = true
-        }
-        if self.incomingVideoViewRequested && !self.outgoingVideoViewRequested && !self.displayedCameraTooltip && (self.toastContent?.isEmpty ?? true) {
-            self.displayedCameraTooltip = true
-            Queue.mainQueue().after(2.0) {
-                self.displayCameraTooltip()
-            }
         }
         
         switch callState.state {
@@ -1071,9 +1049,9 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 self.isShowingEndCallUI = true
                 let duration = 0.3
                 
-                let nodes: [ASDisplayNode] = [self.backButtonNode, self.backButtonArrowNode, self.keyButtonNode, self.emojiTooltip]
+                let nodes: [ASDisplayNode] = [self.backButtonNode, self.backButtonArrowNode, self.keyButtonNode, self.emojiTooltip, self.toastNode]
                 for node in nodes {
-                    node.layer.animateAlpha(from: CGFloat(self.backButtonNode.layer.opacity), to: 0.0, duration: duration, removeOnCompletion: false)
+                    node.layer.animateAlpha(from: CGFloat(node.layer.opacity), to: 0.0, duration: duration, removeOnCompletion: false)
                 }
             }
         default:
@@ -1126,25 +1104,28 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         if case .terminating = callState.state {
         } else if case .terminated = callState.state {
         } else {
-            var toastContent: CallControllerToastContent = []
-            if case .active = callState.state {
-                if let displayToastsAfterTimestamp = self.displayToastsAfterTimestamp {
-                    if CACurrentMediaTime() > displayToastsAfterTimestamp {
-                        if case .inactive = callState.remoteVideoState, self.hasVideoNodes {
-                            toastContent.insert(.camera)
-                        }
-                        if case .muted = callState.remoteAudioState {
-                            toastContent.insert(.microphone)
-                        }
-                        if case .low = callState.remoteBatteryLevel {
-                            toastContent.insert(.battery)
-                        }
-                    }
-                } else {
-                    self.displayToastsAfterTimestamp = CACurrentMediaTime() + 1.5
-                }
-            }
-            if self.isMuted, let (availableOutputs, _) = self.audioOutputState, availableOutputs.count > 2 {
+            var toastContent: ModernCallControllerToastContent = []
+//            if case .active = callState.state {
+//                if let displayToastsAfterTimestamp = self.displayToastsAfterTimestamp {
+//                    if CACurrentMediaTime() > displayToastsAfterTimestamp {
+//                        if case .inactive = callState.remoteVideoState, self.hasVideoNodes {
+//                            toastContent.insert(.camera)
+//                        }
+//                        if case .muted = callState.remoteAudioState {
+//                            toastContent.insert(.microphone)
+//                        }
+//                        if case .low = callState.remoteBatteryLevel {
+//                            toastContent.insert(.battery)
+//                        }
+//                    }
+//                } else {
+//                    self.displayToastsAfterTimestamp = CACurrentMediaTime() + 1.5
+//                }
+//            }
+//            if self.isMuted, let (availableOutputs, _) = self.audioOutputState, availableOutputs.count > 2 {
+//                toastContent.insert(.mute)
+//            }
+            if self.isMuted {
                 toastContent.insert(.mute)
             }
             self.toastContent = toastContent
@@ -1474,7 +1455,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         let buttonsCollapsedOriginY = self.pictureInPictureTransitionFraction > 0.0 ? layout.size.height + 30.0 : layout.size.height + 10.0
         let buttonsOriginY = interpolate(from: buttonsCollapsedOriginY, to: defaultButtonsOriginY, value: uiDisplayTransition)
         
-        let toastHeight = self.toastNode.updateLayout(strings: self.presentationData.strings, content: self.toastContent, constrainedWidth: layout.size.width, bottomInset: layout.intrinsicInsets.bottom + buttonsHeight, transition: transition)
+        var toastHeight = self.toastNode.updateLayout(strings: self.presentationData.strings, content: self.toastContent, constrainedWidth: layout.size.width, bottomInset: layout.intrinsicInsets.bottom + buttonsHeight, transition: transition)
+        toastHeight = 30.0
         
         let toastSpacing: CGFloat = 22.0
         let toastCollapsedOriginY = self.pictureInPictureTransitionFraction > 0.0 ? layout.size.height : layout.size.height - max(layout.intrinsicInsets.bottom, 20.0) - toastHeight
