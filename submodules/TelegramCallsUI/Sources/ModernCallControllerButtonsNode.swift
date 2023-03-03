@@ -466,7 +466,11 @@ final class ModernCallControllerButtonsNode: ASDisplayNode {
             buttonNode.accessibilityTraits = buttonAccessibilityTraits
             
             if animateButtonIn {
-                buttonNode.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
+                if button.button.key == .soundOutput {
+                    buttonNode.animateAppearTowardsCenter(duration: 0.2)
+                } else {
+                    buttonNode.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
+                }
             }
         }
         
@@ -480,6 +484,10 @@ final class ModernCallControllerButtonsNode: ASDisplayNode {
                         transition.updateAlpha(node: button, alpha: 0.0, completion: { [weak button] _ in
                             button?.removeFromSupernode()
                         })
+                    } else if case .switchCamera = key {
+                        button.animateDisappearIntoCenter(duration: 0.2) {
+                            button.removeFromSupernode()
+                        }
                     } else {
                         transition.updateAlpha(node: button, alpha: 0.0, completion: { [weak button] _ in
                             button?.removeFromSupernode()

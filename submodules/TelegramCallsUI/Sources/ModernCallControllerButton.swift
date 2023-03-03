@@ -68,9 +68,8 @@ final class ModernCallControllerButtonItemNode: HighlightTrackingButtonNode {
     private let effectView: UIVisualEffectView
     private let contentBackgroundNode: ASImageNode
     private let contentNode: ASImageNode
-    private var animationNode: AnimationNode?
+    private let underNode: ASImageNode
     private let overlayHighlightNode: ASImageNode
-    private var statusNode: SemanticStatusNode?
     let textNode: ImmediateTextNode
     
     private let largeButtonSize: CGFloat
@@ -96,6 +95,9 @@ final class ModernCallControllerButtonItemNode: HighlightTrackingButtonNode {
         
         self.contentNode = ASImageNode()
         self.contentNode.isUserInteractionEnabled = false
+        
+        self.underNode = ASImageNode()
+        self.underNode.isUserInteractionEnabled = false
         
         self.overlayHighlightNode = ASImageNode()
         self.overlayHighlightNode.isUserInteractionEnabled = false
@@ -129,7 +131,7 @@ final class ModernCallControllerButtonItemNode: HighlightTrackingButtonNode {
             } else {
                 strongSelf.overlayHighlightNode.alpha = 0.0
                 strongSelf.overlayHighlightNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.2)
-                let transition: ContainedViewLayoutTransition = .animated(duration: 0.5, curve: .spring)
+                let transition: ContainedViewLayoutTransition = .animated(duration: 0.24, curve: .custom(0.0, 0.5, 0.5, 3.0))
                 transition.updateSublayerTransformScale(node: strongSelf, scale: 1.0)
             }
         }
@@ -138,6 +140,52 @@ final class ModernCallControllerButtonItemNode: HighlightTrackingButtonNode {
     override func layout() {
         super.layout()
         self.wrapperNode.frame = self.bounds
+    }
+    
+    func animateAppearTowardsCenter(duration: Double) {
+        let path = UIBezierPath()
+        path.addArc(withCenter: CGPoint(x: self.contentNode.bounds.width / 2.0, y: self.contentNode.bounds.height / 2.0), radius: self.contentNode.bounds.width / 2.0, startAngle: 0, endAngle: 2 * CGFloat.pi, clockwise: true)
+        
+        let mask = CAShapeLayer()
+        mask.frame = self.contentNode.bounds
+        mask.lineWidth = 0
+        mask.path = path.cgPath
+        mask.strokeColor = UIColor.black.cgColor
+        mask.fillColor = nil
+        
+        let animation = CABasicAnimation(keyPath: "lineWidth")
+        animation.toValue = max(self.contentNode.bounds.width, self.contentNode.bounds.height)
+        animation.duration = duration
+        animation.fillMode = .forwards
+        animation.isRemovedOnCompletion = false
+        animation.completion = { [weak self] _ in
+            self?.contentNode.layer.mask = nil
+        }
+        
+        mask.add(animation, forKey: "lineWidth")
+        self.contentNode.layer.mask = mask
+        
+        self.textNode.layer.animateAlpha(from: CGFloat(self.textNode.layer.opacity), to: 1.0, duration: duration, removeOnCompletion: false)
+    }
+    
+    func animateDisappearIntoCenter(duration: Double, completion: @escaping () -> Void) {
+        let mask = CAShapeLayer()
+        mask.frame = self.contentNode.bounds
+        mask.path = UIBezierPath(roundedRect: self.contentNode.bounds, cornerRadius: self.contentNode.bounds.width / 2.0).cgPath
+        
+        let animation = CABasicAnimation(keyPath: "transform.scale")
+        animation.toValue = 0.0
+        animation.duration = duration
+        animation.isRemovedOnCompletion = false
+        animation.fillMode = .forwards
+        animation.completion = { _ in
+            completion()
+        }
+        mask.add(animation, forKey: "scale")
+        
+        self.contentNode.layer.mask = mask
+        
+        self.textNode.layer.animateAlpha(from: CGFloat(self.textNode.layer.opacity), to: 0.0, duration: duration, removeOnCompletion: false)
     }
     
     func update(size: CGSize, content: Content, text: String, transition: ContainedViewLayoutTransition) {
@@ -155,28 +203,6 @@ final class ModernCallControllerButtonItemNode: HighlightTrackingButtonNode {
             self.currentContent = content
             self.size = size
             
-            if content.hasProgress {
-                let statusFrame = CGRect(origin: CGPoint(), size: CGSize(width: self.largeButtonSize, height: self.largeButtonSize))
-                if self.statusNode == nil {
-                    let statusNode = SemanticStatusNode(backgroundNodeColor: .white, foregroundNodeColor: .clear, cutout: statusFrame.insetBy(dx: 8.0, dy: 8.0))
-                    self.statusNode = statusNode
-                    self.contentContainer.insertSubnode(statusNode, belowSubnode: self.contentNode)
-                    statusNode.transitionToState(.progress(value: nil, cancelEnabled: false, appearance: SemanticStatusNodeState.ProgressAppearance(inset: 4.0, lineWidth: 3.0)), animated: false, completion: {})
-                }
-                if let statusNode = self.statusNode {
-                    statusNode.frame = statusFrame
-                    if transition.isAnimated {
-                        statusNode.layer.animateScale(from: 0.1, to: 1.0, duration: 0.2)
-                        statusNode.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
-                    }
-                }
-            } else if let statusNode = self.statusNode {
-                self.statusNode = nil
-                transition.updateAlpha(node: statusNode, alpha: 0.0, completion: { [weak statusNode] _ in
-                    statusNode?.removeFromSupernode()
-                })
-            }
-            
             switch content.appearance {
             case .blurred:
                 self.effectView.isHidden = false
@@ -188,35 +214,6 @@ final class ModernCallControllerButtonItemNode: HighlightTrackingButtonNode {
             self.wrapperNode.isUserInteractionEnabled = content.isEnabled
             
             let contentBackgroundImage: UIImage? = nil
-            
-            var animationName: String?
-            switch content.image {
-                case .cameraOff:
-                    animationName = "anim_cameraoff"
-                case .cameraOn:
-                    animationName = "anim_cameraon"
-                default:
-                    break
-            }
-            
-            if let animationName = animationName {
-                let animationFrame = CGRect(origin: CGPoint(), size: CGSize(width: self.largeButtonSize, height: self.largeButtonSize))
-                if self.animationNode == nil {
-                    let animationNode = AnimationNode(animation: animationName, colors: nil, scale: 1.0)
-                    self.animationNode = animationNode
-                    self.contentContainer.insertSubnode(animationNode, aboveSubnode: self.contentNode)
-                }
-                if let animationNode = self.animationNode {
-                    animationNode.bounds = animationFrame
-                    animationNode.position = CGPoint(x: self.largeButtonSize / 2.0, y: self.largeButtonSize / 2.0)
-                    if previousContent == nil {
-                        animationNode.seekToEnd()
-                    } else if previousContent?.image != content.image {
-                        animationNode.setAnimation(name: animationName)
-                        animationNode.play()
-                    }
-                }
-            }
             
             let contentImage = generateImage(CGSize(width: self.largeButtonSize, height: self.largeButtonSize), contextGenerator: { size, context in
                 context.clear(CGRect(origin: CGPoint(), size: size))
@@ -347,9 +344,99 @@ final class ModernCallControllerButtonItemNode: HighlightTrackingButtonNode {
                 }
                 self.contentNode.image = contentImage
                 self.contentNode.layer.animateRotation(from: -rotation, to: 0.0, duration: 0.5, timingFunction: kCAMediaTimingFunctionSpring)
-            } else if transition.isAnimated, let contentImage = contentImage, let previousContent = self.contentNode.image {
+            } else if transition.isAnimated, previousContent?.image == .cross, let contentImage = contentImage, let previousContent = self.contentNode.image {
                 self.contentNode.image = contentImage
                 self.contentNode.layer.animate(from: previousContent.cgImage!, to: contentImage.cgImage!, keyPath: "contents", timingFunction: CAMediaTimingFunctionName.easeInEaseOut.rawValue, duration: 0.2)
+            } else if transition.isAnimated, let contentImage = contentImage, let previousContent = self.contentNode.image {
+
+                self.underNode.removeFromSupernode()
+                self.underNode.image = previousContent
+                self.underNode.frame = self.contentNode.frame
+                self.contentContainer.insertSubnode(self.underNode, belowSubnode: self.contentNode)
+                
+                
+                let duration = 0.2
+                
+                underNode.layer.mask = {
+                    let mask = CAShapeLayer()
+                    mask.frame = self.underNode.bounds
+                    if content.appearance.isFilled {
+                        mask.path = UIBezierPath(roundedRect: underNode.bounds, cornerRadius: underNode.bounds.width / 2.0).cgPath
+                        
+                        let animation = CABasicAnimation(keyPath: "transform.scale")
+                        animation.toValue = 0.0
+                        animation.duration = duration
+                        animation.isRemovedOnCompletion = false
+                        animation.fillMode = .forwards
+                        animation.completion = { [weak self] _ in
+                            self?.underNode.removeFromSupernode()
+                        }
+                        
+                        mask.add(animation, forKey: "scale")
+                    } else {
+                        let path = UIBezierPath()
+                        path.addArc(withCenter: CGPoint(x: self.underNode.bounds.width / 2.0, y: self.underNode.bounds.height / 2.0), radius: self.underNode.bounds.width / 2.0, startAngle: 0, endAngle: 2 * CGFloat.pi, clockwise: true)
+                        
+                        mask.lineWidth = max(self.underNode.bounds.width, self.underNode.bounds.height)
+                        mask.path = path.cgPath
+                        mask.strokeColor = UIColor.black.cgColor
+                        mask.fillColor = nil
+                        
+                        let animation = CABasicAnimation(keyPath: "lineWidth")
+                        animation.toValue = 0
+                        animation.duration = duration
+                        animation.fillMode = .forwards
+                        animation.isRemovedOnCompletion = false
+                        animation.completion = { [weak self] _ in
+                            self?.underNode.removeFromSupernode()
+                        }
+                        
+                        mask.add(animation, forKey: "lineWidth")
+                    }
+                    return mask
+                }()
+                
+                self.contentNode.image = contentImage
+                self.contentNode.layer.mask = {
+                    let mask = CAShapeLayer()
+                    mask.frame = self.contentNode.bounds
+                    
+                    if content.appearance.isFilled {
+                        let path = UIBezierPath()
+                        path.addArc(withCenter: CGPoint(x: self.contentNode.bounds.width / 2.0, y: self.contentNode.bounds.height / 2.0), radius: self.contentNode.bounds.width / 2.0, startAngle: 0, endAngle: 2 * CGFloat.pi, clockwise: true)
+                        
+                        mask.lineWidth = 0
+                        mask.path = path.cgPath
+                        mask.strokeColor = UIColor.black.cgColor
+                        mask.fillColor = nil
+                        
+                        let animation = CABasicAnimation(keyPath: "lineWidth")
+                        animation.toValue = max(self.contentNode.bounds.width, self.contentNode.bounds.height)
+                        animation.duration = duration
+                        animation.fillMode = .forwards
+                        animation.isRemovedOnCompletion = false
+                        animation.completion = { [weak self] _ in
+                            self?.contentNode.layer.mask = nil
+                        }
+                        
+                        mask.add(animation, forKey: "lineWidth")
+                    } else {
+                        mask.path = UIBezierPath(roundedRect: self.contentNode.bounds, cornerRadius: self.contentNode.bounds.width / 2.0).cgPath
+                        
+                        let animation = CABasicAnimation(keyPath: "transform.scale")
+                        animation.fromValue = 0.0
+                        animation.toValue = 1.0
+                        animation.duration = duration
+                        animation.fillMode = .forwards
+                        animation.isRemovedOnCompletion = false
+                        animation.completion = { [weak self] _ in
+                            self?.contentNode.layer.mask = nil
+                        }
+                        
+                        mask.add(animation, forKey: "scale")
+                    }
+                    return mask
+                }()
             } else {
                 self.contentNode.image = contentImage
             }
@@ -384,9 +471,6 @@ final class ModernCallControllerButtonItemNode: HighlightTrackingButtonNode {
         
         transition.updatePosition(node: self.contentContainer, position: CGPoint(x: size.width / 2.0, y: size.height / 2.0))
         transition.updateSublayerTransformScale(node: self.contentContainer, scale: scaleFactor)
-        if let animationNode = self.animationNode {
-            transition.updateTransformScale(node: animationNode, scale: isSmall ? 1.35 : 1.12)
-        }
         
         if self.currentText != text {
             self.textNode.attributedText = NSAttributedString(string: text, font: labelFont, textColor: .white)
