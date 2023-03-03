@@ -232,18 +232,11 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
     }
        
     func hideContentItems() {
-        // TODO: timur
-//        let duration = 0.2
-//        self.titleNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration)
-//        self.cancelButton.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration)
-//        self.wheelNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration)
-//        self.doneButton.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration)
-        
-        
-        self.titleNode.isHidden = true
-        self.cancelButton.isHidden = true
-        self.wheelNode.isHidden = true
-        self.doneButton.isHidden = true
+        let duration = 0.2
+        self.titleNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration, removeOnCompletion: false)
+        self.cancelButton.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration, removeOnCompletion: false)
+        self.wheelNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration, removeOnCompletion: false)
+        self.doneButton.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration, removeOnCompletion: false)
     }
     
     
