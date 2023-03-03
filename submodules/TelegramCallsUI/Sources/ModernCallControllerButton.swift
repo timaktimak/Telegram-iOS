@@ -68,7 +68,7 @@ final class ModernCallControllerButtonItemNode: HighlightTrackingButtonNode {
     private let effectView: UIVisualEffectView
     private let contentBackgroundNode: ASImageNode
     private let contentNode: ASImageNode
-    private let underNode: ASImageNode
+    private weak var underNode: ASImageNode?
     private let overlayHighlightNode: ASImageNode
     let textNode: ImmediateTextNode
     
@@ -95,9 +95,6 @@ final class ModernCallControllerButtonItemNode: HighlightTrackingButtonNode {
         
         self.contentNode = ASImageNode()
         self.contentNode.isUserInteractionEnabled = false
-        
-        self.underNode = ASImageNode()
-        self.underNode.isUserInteractionEnabled = false
         
         self.overlayHighlightNode = ASImageNode()
         self.overlayHighlightNode.isUserInteractionEnabled = false
@@ -349,17 +346,23 @@ final class ModernCallControllerButtonItemNode: HighlightTrackingButtonNode {
                 self.contentNode.layer.animate(from: previousContent.cgImage!, to: contentImage.cgImage!, keyPath: "contents", timingFunction: CAMediaTimingFunctionName.easeInEaseOut.rawValue, duration: 0.2)
             } else if transition.isAnimated, let contentImage = contentImage, let previousContent = self.contentNode.image {
 
-                self.underNode.removeFromSupernode()
-                self.underNode.image = previousContent
-                self.underNode.frame = self.contentNode.frame
-                self.contentContainer.insertSubnode(self.underNode, belowSubnode: self.contentNode)
+                if let underNode = self.underNode {
+                    underNode.layer.animateAlpha(from: CGFloat(underNode.layer.opacity), to: 0.0, duration: 0.05, removeOnCompletion: false)
+                }
+                
+                let underNode = ASImageNode()
+                self.underNode = underNode
+                underNode.isUserInteractionEnabled = false
+                underNode.image = previousContent
+                underNode.frame = self.contentNode.frame
+                self.contentContainer.insertSubnode(underNode, belowSubnode: self.contentNode)
                 
                 
                 let duration = 0.2
                 
                 underNode.layer.mask = {
                     let mask = CAShapeLayer()
-                    mask.frame = self.underNode.bounds
+                    mask.frame = underNode.bounds
                     if content.appearance.isFilled {
                         mask.path = UIBezierPath(roundedRect: underNode.bounds, cornerRadius: underNode.bounds.width / 2.0).cgPath
                         
@@ -368,16 +371,16 @@ final class ModernCallControllerButtonItemNode: HighlightTrackingButtonNode {
                         animation.duration = duration
                         animation.isRemovedOnCompletion = false
                         animation.fillMode = .forwards
-                        animation.completion = { [weak self] _ in
-                            self?.underNode.removeFromSupernode()
+                        animation.completion = { [weak underNode] _ in
+                            underNode?.removeFromSupernode()
                         }
                         
                         mask.add(animation, forKey: "scale")
                     } else {
                         let path = UIBezierPath()
-                        path.addArc(withCenter: CGPoint(x: self.underNode.bounds.width / 2.0, y: self.underNode.bounds.height / 2.0), radius: self.underNode.bounds.width / 2.0, startAngle: 0, endAngle: 2 * CGFloat.pi, clockwise: true)
+                        path.addArc(withCenter: CGPoint(x: underNode.bounds.width / 2.0, y: underNode.bounds.height / 2.0), radius: underNode.bounds.width / 2.0, startAngle: 0, endAngle: 2 * CGFloat.pi, clockwise: true)
                         
-                        mask.lineWidth = max(self.underNode.bounds.width, self.underNode.bounds.height)
+                        mask.lineWidth = max(underNode.bounds.width, underNode.bounds.height)
                         mask.path = path.cgPath
                         mask.strokeColor = UIColor.black.cgColor
                         mask.fillColor = nil
@@ -387,8 +390,8 @@ final class ModernCallControllerButtonItemNode: HighlightTrackingButtonNode {
                         animation.duration = duration
                         animation.fillMode = .forwards
                         animation.isRemovedOnCompletion = false
-                        animation.completion = { [weak self] _ in
-                            self?.underNode.removeFromSupernode()
+                        animation.completion = { [weak underNode] _ in
+                            underNode?.removeFromSupernode()
                         }
                         
                         mask.add(animation, forKey: "lineWidth")
