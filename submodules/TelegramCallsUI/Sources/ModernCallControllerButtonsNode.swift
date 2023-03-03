@@ -530,6 +530,8 @@ final class ModernCallControllerButtonsNode: ASDisplayNode {
     }
     
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard self.isUserInteractionEnabled && self.alpha > 0.01 else { return nil }
+        
         for (_, button) in self.buttonNodes {
             if let result = button.view.hitTest(self.view.convert(point, to: button.view), with: event) {
                 return result

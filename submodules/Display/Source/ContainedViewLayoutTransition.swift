@@ -175,6 +175,18 @@ public extension ContainedViewLayoutTransition {
         }
     }
     
+    func updateZPosition(node: ASDisplayNode, zPosition: CGFloat) {
+        switch self {
+        case .immediate:
+            node.layer.removeAnimation(forKey: "zPosition")
+            node.layer.zPosition = zPosition
+        case let .animated(duration, curve):
+            let prev = node.layer.zPosition
+            node.layer.zPosition = zPosition
+            node.layer.animate(from: prev as NSNumber, to: zPosition as NSNumber, keyPath: "zPosition", timingFunction: curve.timingFunction, duration: duration)
+        }
+    }
+    
     func updateFrameAsPositionAndBounds(node: ASDisplayNode, frame: CGRect, force: Bool = false, beginWithCurrentState: Bool = false, completion: ((Bool) -> Void)? = nil) {
         if node.frame.equalTo(frame) && !force {
             completion?(true)

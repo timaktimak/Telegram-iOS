@@ -26,6 +26,18 @@ private func interpolate(from: CGFloat, to: CGFloat, value: CGFloat) -> CGFloat 
     return (1.0 - value) * from + value * to
 }
 
+private let zPositionBackground = CGFloat(-20)
+private let zPositionAvatar = CGFloat(-19)
+private let zPositionExpandedVideo = CGFloat(-18)
+private let zPositionBackButton = CGFloat(-17)
+private let zPositionStatus = CGFloat(-16)
+private let zPositionToast = CGFloat(-15)
+private let zPositionButtons = CGFloat(-14)
+private let zPositionKey = CGFloat(-12)
+private let zPositionEmojiTooltip = CGFloat(-11)
+
+private let zPositionMinimizedVideo = CGFloat(10)
+
 final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallControllerNodeProtocol {
     private enum VideoNodeCorner {
         case topLeft
@@ -48,7 +60,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     
     private let containerTransformationNode: ASDisplayNode
     private let containerNode: ASDisplayNode
-    private let videoContainerNode: PinchSourceContainerNode
+//    private let videoContainerNode: ASDisplayNode// PinchSourceContainerNode
+    
     
     private let backgroundNode: ModernCallBackgroundNode
     private let avatarNode: ModernCallAvatarNode
@@ -88,6 +101,11 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     private var keyPreviewNode: CallControllerKeyPreviewNode?
     private var keyPreview: ModernCallControllerKeyPreviewNode?
     private let emojiTooltip: ModernCallEmojiTooltip
+    
+    private var tapRecognizer: UITapGestureRecognizer!
+    private var panRecognizer: CallPanGestureRecognizer!
+    
+    private var isPreviewingOutgoingVideo = false
     
 //    private var debugNode: CallDebugNode?
     
@@ -167,7 +185,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         
         self.containerNode = ASDisplayNode()
         
-        self.videoContainerNode = PinchSourceContainerNode()
+//        self.videoContainerNode = ASDisplayNode()
         
 //        self.imageNode = TransformImageNode()
 //        self.imageNode.contentAnimations = [.subsequentUpdates]
@@ -177,18 +195,15 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         
         self.avatarNode = ModernCallAvatarNode()
         
-//        self.dimNode = ASImageNode()
-//        self.dimNode.contentMode = .scaleToFill
-//        self.dimNode.isUserInteractionEnabled = false
-//        self.dimNode.backgroundColor = UIColor(white: 0.0, alpha: 0.3)
-        
         self.backButtonArrowNode = ASImageNode()
         self.backButtonArrowNode.displayWithoutProcessing = true
         self.backButtonArrowNode.displaysAsynchronously = false
         self.backButtonArrowNode.image = NavigationBarTheme.generateBackArrowImage(color: .white)
         self.backButtonArrowNode.alpha = 0.0
+        self.backButtonArrowNode.isHidden = true
         self.backButtonNode = HighlightableButtonNode()
         self.backButtonNode.alpha = 0.0
+        self.backButtonNode.isHidden = true
         
         self.statusNode = ModernCallControllerStatusNode()
         
@@ -228,20 +243,29 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             }
         }
         
-//        self.containerNode.addSubnode(self.imageNode)
+        self.backgroundNode.zPosition = zPositionBackground
         self.containerNode.addSubnode(self.backgroundNode)
+        self.avatarNode.zPosition = zPositionAvatar
         self.containerNode.addSubnode(self.avatarNode)
-        self.containerNode.addSubnode(self.videoContainerNode)
+        // video
+//        self.containerNode.addSubnode(self.videoContainerNode)
 //        self.containerNode.addSubnode(self.dimNode)
+        self.statusNode.zPosition = zPositionStatus
         self.containerNode.addSubnode(self.statusNode)
+        self.buttonsNode.zPosition = zPositionButtons
         self.containerNode.addSubnode(self.buttonsNode)
+        self.toastNode.zPosition = zPositionToast
         self.containerNode.addSubnode(self.toastNode)
+        self.keyButtonNode.zPosition = zPositionKey
         self.containerNode.addSubnode(self.keyButtonNode)
         // TODO: timur remove?
         if easyDebugAccess || !UserDefaults.standard.bool(forKey: "emoji-tooltip-pressed") {
+            self.emojiTooltip.zPosition = zPositionEmojiTooltip
             self.containerNode.addSubnode(self.emojiTooltip)
         }
+        self.backButtonArrowNode.zPosition = zPositionBackButton
         self.containerNode.addSubnode(self.backButtonArrowNode)
+        self.backButtonNode.zPosition = zPositionBackButton
         self.containerNode.addSubnode(self.backButtonNode)
         
         self.buttonsNode.mute = { [weak self] in
@@ -340,6 +364,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                                     guard let strongSelf = self, let outgoingVideoNode = strongSelf.candidateOutgoingVideoNodeValue else {
                                         return
                                     }
+                                    strongSelf.isPreviewingOutgoingVideo = false
                                     strongSelf.candidateOutgoingVideoNodeValue = nil
                                     
                                     if strongSelf.isRequestingVideo {
@@ -347,17 +372,17 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                                     }
                                     
                                     strongSelf.outgoingVideoNodeValue = outgoingVideoNode
-                                    outgoingVideoNode.removeFromSupernode()
-                                    if let expandedVideoNode = strongSelf.expandedVideoNode {
+                                    
+//                                    outgoingVideoNode.removeFromSupernode()
+                                    if strongSelf.expandedVideoNode != nil {
                                         strongSelf.minimizedVideoNode = outgoingVideoNode
-                                        strongSelf.videoContainerNode.contentNode.insertSubnode(outgoingVideoNode, aboveSubnode: expandedVideoNode)
+//                                        strongSelf.videoContainerNode.contentNode.insertSubnode(outgoingVideoNode, aboveSubnode: expandedVideoNode)
                                     } else {
                                         strongSelf.expandedVideoNode = outgoingVideoNode
-                                        strongSelf.videoContainerNode.contentNode.addSubnode(outgoingVideoNode)
+//                                        strongSelf.videoContainerNode.contentNode.addSubnode(outgoingVideoNode)
                                     }
                                     strongSelf.updateButtonsMode(transition: .animated(duration: 0.4, curve: .spring))
                                     
-                                    strongSelf.updateDimVisibility()
                                     strongSelf.maybeScheduleUIHidingForActiveVideoCall()
                                 }
                                 
@@ -402,7 +427,9 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //                                    self?.presentingViewController?.dismiss(animated: false, completion: nil)
                                 }
                                 
-                                wrapper.cancel = { [weak wrapper] in
+                                wrapper.cancel = { [weak self, weak wrapper] in
+                                    self?.isPreviewingOutgoingVideo = false
+                                    
                                     guard let strongWrapper = wrapper else {
                                         return
                                     }
@@ -422,8 +449,14 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //                                    }
                                 }
                                 
-                                strongSelf.containerNode.addSubnode(wrapper)
-                                wrapper.frame = strongSelf.bounds
+                                strongSelf.isPreviewingOutgoingVideo = true
+
+                                strongSelf.containerNode.insertSubnode(wrapper, belowSubnode: strongSelf.buttonsNode) // recognizer
+
+                                wrapper.frame = strongSelf.containerNode.bounds
+                                
+                                strongSelf.dismissKeyPreview()
+                                strongSelf.dismissAllTooltips?()
                                 
                                 if let (layout, navigationBarHeight) = self?.validLayout {
                                     wrapper.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .immediate)
@@ -432,7 +465,6 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                                 let videoButtonFrame = strongSelf.buttonsNode.videoButtonFrame().flatMap {
                                     return strongSelf.buttonsNode.view.convert($0, to: strongSelf.view)
                                 }
-                                
                                 if let videoButtonFrame {
                                     wrapper.animateRadialMask(from: videoButtonFrame, to: wrapper.frame)
                                 }
@@ -510,39 +542,39 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             }
         })
         
-        self.videoContainerNode.activate = { [weak self] sourceNode in
-            guard let strongSelf = self else {
-                return
-            }
-            let pinchController = PinchController(sourceNode: sourceNode, getContentAreaInScreenSpace: {
-                return UIScreen.main.bounds
-            })
-            strongSelf.sharedContext.mainWindow?.presentInGlobalOverlay(pinchController)
-            strongSelf.isVideoPinched = true
-            
-            strongSelf.videoContainerNode.contentNode.clipsToBounds = true
-            strongSelf.videoContainerNode.backgroundColor = .black
-            
-            if let (layout, navigationBarHeight) = strongSelf.validLayout {
-                strongSelf.videoContainerNode.contentNode.cornerRadius = layout.deviceMetrics.screenCornerRadius
-                
-                strongSelf.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .immediate)
-            }
-        }
-        
-        self.videoContainerNode.animatedOut = { [weak self] in
-            guard let strongSelf = self else {
-                return
-            }
-            strongSelf.isVideoPinched = false
-            
-            strongSelf.videoContainerNode.backgroundColor = .clear
-            strongSelf.videoContainerNode.contentNode.cornerRadius = 0.0
-            
-            if let (layout, navigationBarHeight) = strongSelf.validLayout {
-                strongSelf.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .animated(duration: 0.3, curve: .easeInOut))
-            }
-        }
+//        self.videoContainerNode.activate = { [weak self] sourceNode in
+//            guard let strongSelf = self else {
+//                return
+//            }
+//            let pinchController = PinchController(sourceNode: sourceNode, getContentAreaInScreenSpace: {
+//                return UIScreen.main.bounds
+//            })
+//            strongSelf.sharedContext.mainWindow?.presentInGlobalOverlay(pinchController)
+//            strongSelf.isVideoPinched = true
+//
+//            strongSelf.videoContainerNode.contentNode.clipsToBounds = true
+//            strongSelf.videoContainerNode.backgroundColor = .black
+//
+//            if let (layout, navigationBarHeight) = strongSelf.validLayout {
+//                strongSelf.videoContainerNode.contentNode.cornerRadius = layout.deviceMetrics.screenCornerRadius
+//
+//                strongSelf.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .immediate)
+//            }
+//        }
+//
+//        self.videoContainerNode.animatedOut = { [weak self] in
+//            guard let strongSelf = self else {
+//                return
+//            }
+//            strongSelf.isVideoPinched = false
+//
+//            strongSelf.videoContainerNode.backgroundColor = .clear
+//            strongSelf.videoContainerNode.contentNode.cornerRadius = 0.0
+//
+//            if let (layout, navigationBarHeight) = strongSelf.validLayout {
+//                strongSelf.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .animated(duration: 0.3, curve: .easeInOut))
+//            }
+//        }
     }
     
     deinit {
@@ -554,8 +586,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     override func didLoad() {
         super.didLoad()
         
-        let panRecognizer = CallPanGestureRecognizer(target: self, action: #selector(self.panGesture(_:)))
-        panRecognizer.shouldBegin = { [weak self] _ in
+        self.panRecognizer = CallPanGestureRecognizer(target: self, action: #selector(self.panGesture(_:)))
+        self.panRecognizer.shouldBegin = { [weak self] _ in
             guard let strongSelf = self else {
                 return false
             }
@@ -566,8 +598,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         }
         self.view.addGestureRecognizer(panRecognizer)
         
-        let tapRecognizer = UITapGestureRecognizer(target: self, action: #selector(self.tapGesture(_:)))
-        self.view.addGestureRecognizer(tapRecognizer)
+        self.tapRecognizer = UITapGestureRecognizer(target: self, action: #selector(self.tapGesture(_:)))
+        self.view.addGestureRecognizer(self.tapRecognizer)
     }
     
     func updatePeer(accountPeer: Peer, peer: Peer, hasOther: Bool) {
@@ -672,14 +704,17 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                             strongSelf.incomingVideoNodeValue = incomingVideoNode
                             if let expandedVideoNode = strongSelf.expandedVideoNode {
                                 strongSelf.minimizedVideoNode = expandedVideoNode
-                                strongSelf.videoContainerNode.contentNode.insertSubnode(incomingVideoNode, belowSubnode: expandedVideoNode)
+                                
+//                                strongSelf.videoContainerNode.insertSubnode(incomingVideoNode, belowSubnode: expandedVideoNode)
                             } else {
-                                strongSelf.videoContainerNode.contentNode.addSubnode(incomingVideoNode)
+//                                strongSelf.containerNode.insertSubnode(incomingVideoNode, aboveSubnode: strongSelf.avatarNode)
+//                                strongSelf.videoContainerNode.addSubnode(incomingVideoNode)
                             }
+                            strongSelf.containerNode.insertSubnode(incomingVideoNode, at: 0)
+                            
                             strongSelf.expandedVideoNode = incomingVideoNode
                             strongSelf.updateButtonsMode(transition: .animated(duration: 0.4, curve: .spring))
                             
-                            strongSelf.updateDimVisibility()
                             strongSelf.maybeScheduleUIHidingForActiveVideoCall()
                         }
                         
@@ -763,7 +798,6 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //                            }
 //                            strongSelf.updateButtonsMode(transition: .animated(duration: 0.4, curve: .spring))
 //
-//                            strongSelf.updateDimVisibility()
 //                            strongSelf.maybeScheduleUIHidingForActiveVideoCall()
 //                        }
 //
@@ -941,18 +975,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                         positionAnimation.timingFunction = timingFunction
                         node.layer.add(positionAnimation, forKey: "positionAnimation")
                         
-                        let opacityAnimation = CABasicAnimation(keyPath: "opacity")
-                        opacityAnimation.fromValue = 0.0
-                        opacityAnimation.toValue = 1.0
-                        opacityAnimation.duration = duration
-                        opacityAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                        opacityAnimation.isRemovedOnCompletion = false
-                        opacityAnimation.fillMode = .forwards
-                        opacityAnimation.completion = { [weak self] _ in
-                            self?.backButtonNode.alpha = 1.0
-                            self?.backButtonArrowNode.alpha = 1.0
-                        }
-                        node.layer.add(opacityAnimation, forKey: "opacityAnimation")
+                        node.isHidden = false
+                        node.layer.animateAlpha(from: 0.0, to: 1.0, duration: duration)
                     }
                     
                     self.emojiTooltip.set(isDark: self.call.isVideo, animated: false)
@@ -991,13 +1015,13 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                     }
                     self.emojiTooltip.layer.add(tooltipAlpha, forKey: "tooltipAlpha")
                     
-//                    let timer = SwiftSignalKit.Timer(timeout: 3.0, repeat: false, completion: { [weak self] in
-//                        self?.hideTooltip()
-//                        self?.hideEmojiTooltipTimer?.invalidate()
-//                        self?.hideEmojiTooltipTimer = nil
-//                    }, queue: Queue.mainQueue())
-//                    timer.start()
-//                    self.hideEmojiTooltipTimer = timer
+                    let timer = SwiftSignalKit.Timer(timeout: 3.0, repeat: false, completion: { [weak self] in
+                        self?.hideTooltip()
+                        self?.hideEmojiTooltipTimer?.invalidate()
+                        self?.hideEmojiTooltipTimer = nil
+                    }, queue: Queue.mainQueue())
+                    timer.start()
+                    self.hideEmojiTooltipTimer = timer
                     
                     if let (layout, navigationBarHeight) = self.validLayout {
                         self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .immediate)
@@ -1037,7 +1061,6 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         
         self.updateToastContent()
         self.updateButtonsMode()
-        self.updateDimVisibility()
         
         if self.incomingVideoViewRequested || self.outgoingVideoViewRequested {
             self.displayedCameraConfirmation = true
@@ -1047,7 +1070,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         case .terminating, .terminated:
             if !self.isShowingEndCallUI {
                 self.isShowingEndCallUI = true
-                let duration = 0.3
+                let duration = 0.2
                 
                 let nodes: [ASDisplayNode?] = [self.backButtonNode, self.backButtonArrowNode, self.keyButtonNode, self.emojiTooltip, self.toastNode, self.keyPreview]
                 for node in nodes {
@@ -1088,13 +1111,19 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //            self.callEnded?(presentRating)
         }
         
-        let hasIncomingVideoNode = self.incomingVideoNodeValue != nil && self.expandedVideoNode === self.incomingVideoNodeValue
-        self.videoContainerNode.isPinchGestureEnabled = hasIncomingVideoNode
+//        let hasIncomingVideoNode = self.incomingVideoNodeValue != nil && self.expandedVideoNode === self.incomingVideoNodeValue
+//        self.videoContainerNode.isPinchGestureEnabled = hasIncomingVideoNode
         
         self.commonUpdateUI()
     }
     
     private func commonUpdateUI() {
+        self.buttonsNode.isUserInteractionEnabled = !self.isPreviewingOutgoingVideo
+        self.keyButtonNode.isUserInteractionEnabled = !self.isPreviewingOutgoingVideo
+        self.backButtonNode.isUserInteractionEnabled = !self.isPreviewingOutgoingVideo
+        self.tapRecognizer.isEnabled = !self.isPreviewingOutgoingVideo
+        self.panRecognizer.isEnabled = !self.isPreviewingOutgoingVideo
+        
         let isDark = self.hasVideoNodes
         self.emojiTooltip.set(isDark: isDark, animated: true)
         self.keyPreview?.set(isDark: isDark, animated: true)
@@ -1144,7 +1173,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         }
     }
     
-    private func updateDimVisibility(transition: ContainedViewLayoutTransition = .animated(duration: 0.3, curve: .easeInOut)) {
+//    private func updateDimVisibility(transition: ContainedViewLayoutTransition = .animated(duration: 0.3, curve: .easeInOut)) {
 //        guard let callState = self.callState else {
 //            return
 //        }
@@ -1169,7 +1198,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //            }
 //        }
 //        self.statusNode.setVisible(visible || self.keyPreviewNode != nil, transition: transition)
-    }
+//    }
     
     private func maybeScheduleUIHidingForActiveVideoCall() {
         guard let callState = self.callState, case .active = callState.state, self.incomingVideoNodeValue != nil && self.outgoingVideoNodeValue != nil, !self.hiddenUIForActiveVideoCallOnce && self.keyPreviewNode == nil else {
@@ -1495,11 +1524,13 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         transition.updateCornerRadius(layer: self.containerTransformationNode.layer, cornerRadius: self.pictureInPictureTransitionFraction * 10.0)
         
         transition.updateFrame(node: self.containerNode, frame: CGRect(origin: CGPoint(x: (containerFrame.width - layout.size.width) / 2.0, y: floor(containerFrame.height - layout.size.height) / 2.0), size: layout.size))
-        transition.updateFrame(node: self.videoContainerNode, frame: containerFullScreenFrame)
-        self.videoContainerNode.update(size: containerFullScreenFrame.size, transition: transition)
+//        transition.updateFrame(node: self.videoContainerNode, frame: containerFullScreenFrame)
         
-//        transition.updateAlpha(node: self.dimNode, alpha: pinchTransitionAlpha)
-//        transition.updateFrame(node: self.dimNode, frame: containerFullScreenFrame)
+//        if let expandedVideoNode = self.expandedVideoNode {
+//            transition.updateFrame(node: expandedVideoNode, frame: <#T##CGRect#>)
+//        }
+        
+//        self.videoContainerNode.update(size: containerFullScreenFrame.size, transition: transition)
         
 //        if let keyPreviewNode = self.keyPreviewNode {
 //            transition.updateFrame(node: keyPreviewNode, frame: containerFullScreenFrame)
@@ -1508,10 +1539,6 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         
         transition.updateFrame(node: self.backgroundNode, frame: containerFullScreenFrame)
         self.backgroundNode.updateLayout(size: self.backgroundNode.bounds.size, transition: transition)
-//        transition.updateFrame(node: self.imageNode, frame: containerFullScreenFrame)
-//        let arguments = TransformImageArguments(corners: ImageCorners(), imageSize: CGSize(width: 640.0, height: 640.0).aspectFilled(layout.size), boundingSize: layout.size, intrinsicInsets: UIEdgeInsets())
-//        let apply = self.imageNode.asyncLayout()(arguments)
-//        apply()
         
         let navigationOffset: CGFloat = max(20.0, layout.safeInsets.top)
         let topOriginY = interpolate(from: -20.0, to: navigationOffset, value: uiDisplayTransition)
@@ -1522,8 +1549,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         }
         transition.updateFrame(node: self.backButtonNode, frame: CGRect(origin: CGPoint(x: 29.0, y: topOriginY + 11.0), size: backSize))
         
-//        transition.updateAlpha(node: self.backButtonArrowNode, alpha: overlayAlpha)
-//        transition.updateAlpha(node: self.backButtonNode, alpha: overlayAlpha)
+        transition.updateAlpha(node: self.backButtonArrowNode, alpha: overlayAlpha)
+        transition.updateAlpha(node: self.backButtonNode, alpha: overlayAlpha)
         transition.updateAlpha(node: self.toastNode, alpha: toastAlpha)
         
         // TODO: timur
@@ -1598,6 +1625,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 expandedVideoTransition.updateFrame(node: expandedVideoNode, frame: fullscreenVideoFrame)
             }
             
+            transition.updateZPosition(node: expandedVideoNode, zPosition: zPositionExpandedVideo)
             expandedVideoNode.updateLayout(size: expandedVideoNode.frame.size, cornerRadius: 0.0, isOutgoing: expandedVideoNode === self.outgoingVideoNodeValue, deviceOrientation: mappedDeviceOrientation, isCompactLayout: isCompactLayout, transition: expandedVideoTransition)
             
         } else {
@@ -1636,6 +1664,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                     self.animationForExpandedVideoSnapshotView = nil
                 }
                 minimizedVideoTransition.updateFrame(node: minimizedVideoNode, frame: previewVideoFrame)
+                minimizedVideoTransition.updateZPosition(node: minimizedVideoNode, zPosition: zPositionMinimizedVideo)
                 minimizedVideoNode.updateLayout(size: previewVideoFrame.size, cornerRadius: interpolate(from: 14.0, to: 24.0, value: self.pictureInPictureTransitionFraction), isOutgoing: minimizedVideoNode === self.outgoingVideoNodeValue, deviceOrientation: mappedDeviceOrientation, isCompactLayout: layout.metrics.widthClass == .compact, transition: minimizedVideoTransition)
                 if transition.isAnimated && didAppear {
                     minimizedVideoNode.layer.animateSpring(from: 0.1 as NSNumber, to: 1.0 as NSNumber, keyPath: "transform.scale", duration: 0.5)
@@ -1757,8 +1786,10 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         
         if self.keyPreview == nil {//}, let keyText = self.keyTextData?.1 {//}, let peer = self.peer {
             let keyPreview = ModernCallControllerKeyPreviewNode(title: "This call is end-to-end encrypted", subtitle: "If the emoji on Emma's screen are the same, this call is 100% secure.", ok: "OK", dismiss: { [weak self] in
-                self?.dismiss()
+                self?.dismissKeyPreview()
             })
+            self.keyButtonNode.zPosition = CGFloat(1001.0)
+            keyPreview.zPosition = CGFloat(1000.0)
             keyPreview.set(isDark: self.callState?.remoteVideoState == .active, animated: false)
             
             self.containerNode.insertSubnode(keyPreview, belowSubnode: self.keyButtonNode)
@@ -1808,14 +1839,12 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 positionAnimation.isRemovedOnCompletion = false
                 self.keyButtonNode.layer.add(positionAnimation, forKey: "positionAnimation")
                 
-                
                 self.keyButtonNode.animateSpread(duration: duration)
             }
         }
     }
     
-    private func dismiss() {
-        
+    private func dismissKeyPreview() {
         if let keyPreview = self.keyPreview { // TODO: timur reversable?
             let duration = 0.25
             
@@ -1823,6 +1852,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             t.updateAlpha(node: keyPreview, alpha: 0.0, beginWithCurrentState: true)
             t.updateTransformScale(node: keyPreview, scale: 0.1, beginWithCurrentState: true, completion: { [weak self] _ in
                 keyPreview.removeFromSupernode()
+                self?.keyButtonNode.zPosition = zPositionKey
                 self?.keyPreview = nil
                 self?.keyButtonNode.isUserInteractionEnabled = true
             })
@@ -1879,7 +1909,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     
     @objc func backPressed() {
         if self.keyPreview != nil {
-            self.dismiss()
+            self.dismissKeyPreview()
         }
 //        if let keyPreviewNode = self.keyPreviewNode {
 //            self.keyPreviewNode = nil
@@ -1919,7 +1949,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                     
                     self.containerLayoutUpdated(layout, navigationBarHeight: navigationHeight, transition: .animated(duration: 0.4, curve: .spring))
                 }
-            } else if let _ = self.keyPreviewNode {
+            } else if let _ = self.keyPreview {
                 self.backPressed()
             } else {
                 if self.hasVideoNodes {
@@ -2134,6 +2164,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 } else {
                     self.pictureInPictureGestureState = .none
                 }
+                
+                self.dismissKeyPreview()
                 self.dismissAllTooltips?()
             case .changed:
                 if let minimizedVideoNode = self.minimizedVideoNode, let minimizedVideoInitialPosition = self.minimizedVideoInitialPosition {

@@ -163,7 +163,6 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
         
         super.init()
         
-        self.backgroundColor = UIColor.red
         self.isOpaque = false
         
         self.dimNode.view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.dimTapGesture(_:))))
@@ -233,10 +232,18 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
        
     func hideContentItems() {
         let duration = 0.2
-        self.titleNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration, removeOnCompletion: false)
-        self.cancelButton.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration, removeOnCompletion: false)
-        self.wheelNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration, removeOnCompletion: false)
-        self.doneButton.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration, removeOnCompletion: false)
+        self.titleNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration, removeOnCompletion: false, completion: { _ in
+            self.titleNode.removeFromSupernode()
+        })
+        self.cancelButton.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration, removeOnCompletion: false, completion: { _ in
+            self.cancelButton.removeFromSupernode()
+        })
+        self.wheelNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration, removeOnCompletion: false, completion: { _ in
+            self.wheelNode.removeFromSupernode()
+        })
+        self.doneButton.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration, removeOnCompletion: false, completion: { _ in
+            self.doneButton.removeFromSupernode()
+        })
     }
     
     
@@ -274,12 +281,20 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
         }
     }
     
+    private var done = false
     @objc func donePressed() {
-        self.shareCamera?(true)
+        if !done {
+            done = true
+            self.shareCamera?(true)
+        }
     }
     
+    private var cancelled = false
     @objc func cancelPressed() {
-        self.cancel?()
+        if !cancelled {
+            cancelled = true
+            self.cancel?()
+        }
     }
     
     @objc func dimTapGesture(_ recognizer: UITapGestureRecognizer) {
