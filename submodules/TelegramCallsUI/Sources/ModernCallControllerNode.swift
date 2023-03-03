@@ -1067,9 +1067,11 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 //                self.presentCallRating?(callId, self.call.isVideo)
                 self.buttonsNode.layer.animateAlpha(from: 1, to: 0, duration: 0.3, removeOnCompletion: false)
                 
-                let rateView = ModernCallRateNode { _ in
+                let rateView = ModernCallRateNode(apply: { _ in
                     
-                }
+                }, dismiss: { [weak self] in
+                    self?.back?()
+                })
                 self.containerNode.addSubnode(rateView)
                 rateView.frame = CGRect(x: 45, y: self.buttonsNode.frame.minY - 66 - 142, width: self.bounds.width - 90, height: 142)
 //                rateView.layer.animateScale(from: 0.6, to: 1, duration: 3, timingFunction: kCAMediaTimingFunctionSpring)

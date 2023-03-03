@@ -5,6 +5,8 @@ import AsyncDisplayKit
 import SwiftSignalKit
 import AvatarNode
 import TelegramPresentationData
+import AnimatedStickerNode
+import TelegramAnimatedStickerNode
 
 final class ModernCallRateNode: ASDisplayNode {
     private let background: ASDisplayNode
@@ -12,15 +14,16 @@ final class ModernCallRateNode: ASDisplayNode {
     private let subtitle: ASTextNode
     private var starContainerNode: ASDisplayNode
     private let starNodes: [ASButtonNode]
+    private var rating: Int?
     
     private var recognizer: UIPanGestureRecognizer!
     
     private let apply: (Int) -> Void
+    private let dismiss: () -> Void
     
-    var rating: Int?
-    
-    init(apply: @escaping (Int) -> Void) {
+    init(apply: @escaping (Int) -> Void, dismiss: @escaping () -> Void) {
         self.apply = apply
+        self.dismiss = dismiss
         self.background = ASDisplayNode()
         self.background.backgroundColor = UIColor.white.withAlphaComponent(0.25)
         self.background.cornerRadius = 20
@@ -135,15 +138,29 @@ final class ModernCallRateNode: ASDisplayNode {
             animation.duration = 0.16
             animation.isRemovedOnCompletion = true
             
+            var lastSelected: ASDisplayNode?
             for i in 0 ..< self.starNodes.count {
                 let node = self.starNodes[i]
                 node.isSelected = i <= index
                 if node.isSelected {
+                    lastSelected = node
                     node.layer.add(animation, forKey: nil)
                 }
             }
             
-            if let rating = self.rating {
+            if let rating = self.rating, let lastSelected = lastSelected {
+                let size = CGSize(width: 100, height: 100)
+                let node = DefaultAnimatedStickerNodeImpl()
+                node.setup(source: AnimatedStickerNodeLocalFileSource(name: "ModernCallStars"), width: Int(size.width), height: Int(size.height), mode: .direct(cachePathPrefix: nil))
+                node.frame = CGRect(origin: .zero, size: size)
+                node.position = lastSelected.position
+                self.starContainerNode.addSubnode(node)
+                
+                node.completed = { [weak self] x in
+                    self?.dismiss()
+                }
+                node.playOnce()
+                
                 self.apply(rating)
                 self.isUserInteractionEnabled = false
             }
