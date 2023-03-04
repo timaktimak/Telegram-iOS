@@ -26,6 +26,7 @@ private func interpolate(from: CGFloat, to: CGFloat, value: CGFloat) -> CGFloat 
     return (1.0 - value) * from + value * to
 }
 
+private let zPositionBelowAll = CGFloat(-100)
 private let zPositionBackground = CGFloat(-20)
 private let zPositionAvatar = CGFloat(-19)
 private let zPositionExpandedVideo = CGFloat(-18)
@@ -100,6 +101,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     private let buttonsNode: ModernCallControllerButtonsNode
     private var keyPreviewNode: CallControllerKeyPreviewNode?
     private var keyPreview: ModernCallControllerKeyPreviewNode?
+    private var keyPreviewStorage: ModernCallControllerKeyPreviewNode
     private let emojiTooltip: ModernCallEmojiTooltip
     
     private var tapRecognizer: UITapGestureRecognizer!
@@ -192,6 +194,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         
         let accountContext = sharedContext.makeTempAccountContext(account: account)
         self.backgroundNode = ModernCallBackgroundNode(context: accountContext)
+        self.keyPreviewStorage = ModernCallControllerKeyPreviewNode(context: accountContext)
         
         self.avatarNode = ModernCallAvatarNode()
         
@@ -267,6 +270,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         self.containerNode.addSubnode(self.backButtonArrowNode)
         self.backButtonNode.zPosition = zPositionBackButton
         self.containerNode.addSubnode(self.backButtonNode)
+        self.keyPreviewStorage.zPosition = zPositionBelowAll
+        self.containerNode.addSubnode(self.keyPreviewStorage)
         
         self.buttonsNode.mute = { [weak self] in
             self?.toggleMute?()
@@ -659,15 +664,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     }
     
     func updateCallState(_ callState: PresentationCallState) {
-        
-        switch callState.state {
-        case .waiting, .ringing:
-            self.backgroundNode.update(background: .connecting)
-        case .active:
-            self.backgroundNode.update(background: .active)
-        default:
-            break
-        }
+    
+
         
         switch callState.state {
         case .waiting, .ringing, .requesting, .connecting:
@@ -979,7 +977,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                         node.layer.animateAlpha(from: 0.0, to: 1.0, duration: duration)
                     }
                     
-                    self.emojiTooltip.set(isDark: self.call.isVideo, animated: false)
+                    self.emojiTooltip.set(isDark: self.hasVideoNodes, animated: false)
                     
                     self.emojiTooltip.anchorPoint = CGPoint(x: 0.7, y: 0.0)
                     
@@ -1129,6 +1127,19 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         self.keyPreview?.set(isDark: isDark, animated: true)
         self.toastNode.set(isDark: isDark, animated: true)
         self.statusNode.set(isDark: isDark, animated: true)
+        
+        if let callState = self.callState {
+            switch callState.state {
+            case .waiting, .ringing:
+                self.backgroundNode.update(background: .connecting)
+                self.keyPreviewStorage.update(background: .connecting)
+            case .active:
+                self.backgroundNode.update(background: .active)
+                self.keyPreviewStorage.update(background: .active)
+            default:
+                break
+            }
+        }
     }
     
     private var isShowingEndCallUI = false
@@ -1540,6 +1551,9 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         transition.updateFrame(node: self.backgroundNode, frame: containerFullScreenFrame)
         self.backgroundNode.updateLayout(size: self.backgroundNode.bounds.size, transition: transition)
         
+        self.keyPreviewStorage.updateBackgroundSize(size: self.backgroundNode.bounds.size)
+
+        
         let navigationOffset: CGFloat = max(20.0, layout.safeInsets.top)
         let topOriginY = interpolate(from: -20.0, to: navigationOffset, value: uiDisplayTransition)
         
@@ -1785,29 +1799,32 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         self.hideTooltip()
         
         if self.keyPreview == nil {//}, let keyText = self.keyTextData?.1 {//}, let peer = self.peer {
-            let keyPreview = ModernCallControllerKeyPreviewNode(title: "This call is end-to-end encrypted", subtitle: "If the emoji on Emma's screen are the same, this call is 100% secure.", ok: "OK", dismiss: { [weak self] in
+            let keyPreview = self.keyPreviewStorage
+            keyPreview.dismiss = { [weak self] in
                 self?.dismissKeyPreview()
-            })
+            }
             self.keyButtonNode.zPosition = CGFloat(1001.0)
             keyPreview.zPosition = CGFloat(1000.0)
-            keyPreview.set(isDark: self.callState?.remoteVideoState == .active, animated: false)
-            
-            self.containerNode.insertSubnode(keyPreview, belowSubnode: self.keyButtonNode)
+            keyPreview.set(isDark: self.hasVideoNodes, animated: false)
+
             self.keyButtonNode.isUserInteractionEnabled = false
             self.keyPreview = keyPreview
             
             if let (validLayout, _) = self.validLayout {
                 keyPreview.anchorPoint = CGPoint(x: 1, y: 0)
                 
-                ContainedViewLayoutTransition.immediate.updateFrame(node: keyPreview, frame: CGRect(x: 45, y: 132, width: validLayout.size.width - 90, height: 225))
+                let keyPreviewOrigin = CGPoint(x: 45, y: 132)
+                
+                ContainedViewLayoutTransition.immediate.updateFrame(node: keyPreview, frame: CGRect(origin: keyPreviewOrigin, size: CGSize(width: validLayout.size.width - 90, height: 225)))
                 ContainedViewLayoutTransition.immediate.updateTransformScale(node: keyPreview, scale: 0.1)
                 ContainedViewLayoutTransition.immediate.updateAlpha(node: keyPreview, alpha: 0.1)
                 
                 let duration = 0.25
                 
-                let t = ContainedViewLayoutTransition.animated(duration: duration, curve: .spring)
                 keyPreview.updateLayout(size: CGSize(width: validLayout.size.width - 90, height: 225))
+                keyPreview.updateShift(point: keyPreviewOrigin)
                 
+                let t = ContainedViewLayoutTransition.animated(duration: duration, curve: .spring)
                 t.updateTransformScale(node: keyPreview, scale: 1)
                 t.updateAlpha(node: keyPreview, alpha: 1)
 //                
@@ -1851,7 +1868,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             let t = ContainedViewLayoutTransition.animated(duration: duration, curve: .spring)
             t.updateAlpha(node: keyPreview, alpha: 0.0, beginWithCurrentState: true)
             t.updateTransformScale(node: keyPreview, scale: 0.1, beginWithCurrentState: true, completion: { [weak self] _ in
-                keyPreview.removeFromSupernode()
+                keyPreview.zPosition = zPositionBelowAll
                 self?.keyButtonNode.zPosition = zPositionKey
                 self?.keyPreview = nil
                 self?.keyButtonNode.isUserInteractionEnabled = true

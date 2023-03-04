@@ -54,26 +54,16 @@ public class ModernCallBackgroundNode: ASDisplayNode {
     }
     
     func updateLayout(size: CGSize, transition: ContainedViewLayoutTransition) {
-        let isFirstLayout = self.validLayout == nil
         self.validLayout = size
         
         transition.updateFrame(node: self.backgroundNode, frame: CGRect(origin: .zero, size: size))
         self.backgroundNode.updateLayout(size: size, transition: transition)
-        if isFirstLayout, let background = background {
-            update(background: background, force: true)
-        }
     }
     
-    func update(background: ModernCallBackground, force: Bool = false) {
-        if force || self.background != background {
-            self.background = background
-            
-            let gradient = TelegramWallpaper.Gradient(id: nil, colors: background.colors, settings: WallpaperSettings(blur: true)) // TODO: timur
-            backgroundNode.update(wallpaper: .gradient(gradient))
-            //      if DeviceMetrics.performance.isGraphicallyCapable { // TODO: timur
-            backgroundNode.updateIsLooping(false)
-            backgroundNode.updateIsLooping(true)
-        }
-        
+    func update(background: ModernCallBackground) {
+        let gradient = TelegramWallpaper.Gradient(id: nil, colors: background.colors, settings: WallpaperSettings(blur: true))
+        backgroundNode.update(wallpaper: .gradient(gradient))
+        backgroundNode.updateIsLooping(false)
+        backgroundNode.updateIsLooping(true)
     }
 }

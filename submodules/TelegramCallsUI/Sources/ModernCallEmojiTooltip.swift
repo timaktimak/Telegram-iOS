@@ -53,7 +53,7 @@ final class ModernCallEmojiTooltip: ASControlNode {
             self.blurView.effect = effect
         }
         if animated {
-            UIView.animate(withDuration: 0.3) {
+            UIView.animate(withDuration: 0.25, delay: 0.0, options: .curveEaseInOut) {
                 block()
             }
         } else {

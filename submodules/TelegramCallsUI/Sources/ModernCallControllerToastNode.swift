@@ -265,7 +265,7 @@ private class ModernCallControllerToastItemNode: ASDisplayNode {
                 self.effectView.effect = effect
             }
             if animated {
-                UIView.animate(withDuration: 0.3) {
+                UIView.animate(withDuration: 0.25, delay: 0.0, options: .curveEaseInOut) {
                     block()
                 }
             } else {
@@ -277,7 +277,8 @@ private class ModernCallControllerToastItemNode: ASDisplayNode {
     func update(width: CGFloat, content: Content, transition: ContainedViewLayoutTransition) -> CGFloat {
         let inset: CGFloat = 12.0
         let isNarrowScreen = width <= 320.0
-        let font = isNarrowScreen ? smallLabelFont : labelFont
+//        let font = isNarrowScreen ? smallLabelFont : labelFont
+        let font = Font.regular(16.0)
         let topInset: CGFloat = isNarrowScreen ? 5.0 : 4.0
                 
         if self.currentContent != content || self.currentWidth != width {

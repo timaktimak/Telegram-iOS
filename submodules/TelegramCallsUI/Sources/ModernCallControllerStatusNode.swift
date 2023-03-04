@@ -116,7 +116,7 @@ private final class ModernCallWeakNetworkNode: ASDisplayNode {
             }
         }
         if animated {
-            UIView.animate(withDuration: 0.3) {
+            UIView.animate(withDuration: 0.25, delay: 0.0, options: .curveEaseInOut) {
                 block()
             }
         } else {
