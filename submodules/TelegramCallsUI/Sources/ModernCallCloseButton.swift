@@ -129,11 +129,11 @@ private class ActionlessShapeLayer: CAShapeLayer {
 }
 
 private final class Angle: ActionlessShapeLayer {
-    var type: AngleType = .topLeft
+    let type: AngleType
     
     init(type: AngleType) {
-        super.init()
         self.type = type
+        super.init()
         self.fillColor = UIColor.white.cgColor
     }
     
@@ -143,38 +143,120 @@ private final class Angle: ActionlessShapeLayer {
     
     override func layoutSublayers() {
         super.layoutSublayers()
+        if transformed {
+            self.path = transformedPath()
+        } else {
+            let w = self.bounds.width
+            let h = self.bounds.height
+            let start: CGPoint = {
+                switch type {
+                case .topLeft: return CGPoint(x: 0.0, y: h)
+                case .bottomLeft: return CGPoint(x: w, y: h)
+                case .topRight: return CGPoint(x: 0.0, y: 0.0)
+                case .bottomRight: return CGPoint(x: w, y: 0.0)
+                }
+            }()
+            let center: CGPoint = {
+                switch type {
+                case .topLeft: return CGPoint(x: w, y: h)
+                case .bottomLeft: return CGPoint(x: w, y: 0.0)
+                case .topRight: return CGPoint(x: 0.0, y: h)
+                case .bottomRight: return CGPoint(x: 0.0, y: 0.0)
+                }
+            }()
+            let startAngle: CGFloat = {
+                switch type {
+                case .topLeft: return .pi
+                case .bottomLeft: return .pi / 2.0
+                case .topRight: return .pi * 3.0 / 2.0
+                case .bottomRight: return 0
+                }
+            }()
+            let path = UIBezierPath()
+            path.move(to: start)
+            path.addLine(to: path.currentPoint)
+            path.addArc(withCenter: center, radius: w, startAngle: startAngle, endAngle: startAngle + .pi / 2, clockwise: true)
+            path.addLine(to: path.currentPoint)
+            path.addLine(to: center)
+            path.close()
+            self.path = path.cgPath
+        }
+    }
+    
+    private var transformed = false
+    
+    func transform() {
+        transformed = true
+        
+        let animation = CABasicAnimation(keyPath: "path")
+        animation.toValue = transformedPath()
+        animation.duration = 1.0
+        animation.isRemovedOnCompletion = false
+        animation.fillMode = .forwards
+        self.add(animation, forKey: "path")
+    }
+    
+    func transformedPath() -> CGPath {
         let w = self.bounds.width
         let h = self.bounds.height
+        let r = 5.0
+        
         let start: CGPoint = {
             switch type {
             case .topLeft: return CGPoint(x: 0.0, y: h)
             case .bottomLeft: return CGPoint(x: w, y: h)
-            case .topRight: return CGPoint(x: 0.0, y: 0.0)
-            case .bottomRight: return CGPoint(x: w, y: 0.0)
+            default:
+                fatalError()
+            }
+        }()
+        let second: CGPoint = {
+            switch type {
+            case .topLeft: return CGPoint(x: 0.0, y: r)
+            case .bottomLeft: return CGPoint(x: r, y: h)
+            default:
+                fatalError()
+            }
+        }()
+        let third: CGPoint = {
+            switch type {
+            case .topLeft: return CGPoint(x: w, y: 0)
+            case .bottomLeft: return CGPoint(x: 0, y: 0)
+            default:
+                fatalError()
+            }
+        }()
+        let forth: CGPoint = {
+            switch type {
+            case .topLeft: return CGPoint(x: w, y: h)
+            case .bottomLeft: return CGPoint(x: w, y: 0)
+            default:
+                fatalError()
             }
         }()
         let center: CGPoint = {
             switch type {
-            case .topLeft: return CGPoint(x: w, y: h)
-            case .bottomLeft: return CGPoint(x: w, y: 0.0)
-            case .topRight: return CGPoint(x: 0.0, y: h)
-            case .bottomRight: return CGPoint(x: 0.0, y: 0.0)
+            case .topLeft: return CGPoint(x: r, y: r)
+            case .bottomLeft: return CGPoint(x: r, y: h - r)
+            default:
+                fatalError()
             }
         }()
         let startAngle: CGFloat = {
             switch type {
             case .topLeft: return .pi
             case .bottomLeft: return .pi / 2.0
-            case .topRight: return .pi * 3.0 / 2.0
-            case .bottomRight: return 0
+            default:
+                fatalError()
             }
         }()
         let path = UIBezierPath()
         path.move(to: start)
-        path.addArc(withCenter: center, radius: w, startAngle: startAngle, endAngle: startAngle + .pi / 2, clockwise: true)
-        path.addLine(to: center)
+        path.addLine(to: second)
+        path.addArc(withCenter: center, radius: r, startAngle: startAngle, endAngle: startAngle + .pi / 2, clockwise: true)
+        path.addLine(to: third)
+        path.addLine(to: forth)
         path.close()
-        self.path = path.cgPath
+        return path.cgPath
     }
 }
 
@@ -236,15 +318,6 @@ final class ModernCallCloseButton: ASControlNode {
     private var botAngExtension: ActionlessLayer!
     
     private let bigRadius = CGFloat(14)
-    private let smallRadius = CGFloat(10)
-    
-    override init() {
-        super.init()
-
-        Queue.mainQueue().after(2) {
-            self.startAnimating()
-        }
-    }
     
     func startAnimating() {
         
@@ -316,6 +389,9 @@ final class ModernCallCloseButton: ASControlNode {
         let beg = currentTime + duration * (self.left.frame.width / self.top.frame.width)
         self.center.hideAnimated(duration: dur, beginTime: beg)
         self.centerBackground.showAnimated(duration: dur, beginTime: beg)
+        
+        self.topAngle.transform()
+        self.botAngle.transform()
     }
     
     override func didLoad() {

@@ -33,7 +33,8 @@ private let zPositionExpandedVideo = CGFloat(-18)
 private let zPositionBackButton = CGFloat(-17)
 private let zPositionStatus = CGFloat(-16)
 private let zPositionToast = CGFloat(-15)
-private let zPositionButtons = CGFloat(-14)
+private let zPositionUnderButtons = CGFloat(-14)
+private let zPositionButtons = CGFloat(-13)
 private let zPositionKey = CGFloat(-12)
 private let zPositionEmojiTooltip = CGFloat(-11)
 
@@ -1064,18 +1065,20 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             self.displayedCameraConfirmation = true
         }
         
+        // TODO: only if server says
         switch callState.state {
         case .terminating, .terminated:
             if !self.isShowingEndCallUI {
                 self.isShowingEndCallUI = true
                 let duration = 0.2
                 
-                let nodes: [ASDisplayNode?] = [self.backButtonNode, self.backButtonArrowNode, self.keyButtonNode, self.emojiTooltip, self.toastNode, self.keyPreview]
+                let nodes: [ASDisplayNode?] = [self.backButtonNode, self.backButtonArrowNode, self.keyButtonNode, self.emojiTooltip, self.toastNode, self.keyPreview, self.buttonsNode]
                 for node in nodes {
                     if let node {
                         node.layer.animateAlpha(from: CGFloat(node.layer.opacity), to: 0.0, duration: duration, removeOnCompletion: false)
                     }
                 }
+                
                 // TODO: timur show avatar
             }
         default:
@@ -1086,7 +1089,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             let presentRating = reportRating || self.forceReportRating
             if presentRating {
 //                self.presentCallRating?(callId, self.call.isVideo)
-                self.buttonsNode.layer.animateAlpha(from: 1, to: 0, duration: 0.3, removeOnCompletion: false)
+                
+                guard let (layout, _) = self.validLayout else { return }
                 
                 let rateView = ModernCallRateNode(apply: { _ in
                     
@@ -1094,16 +1098,125 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                     self?.back?()
                 })
                 self.containerNode.addSubnode(rateView)
-                rateView.frame = CGRect(x: 45, y: self.buttonsNode.frame.minY - 66 - 142, width: self.bounds.width - 90, height: 142)
-//                rateView.layer.animateScale(from: 0.6, to: 1, duration: 3, timingFunction: kCAMediaTimingFunctionSpring)
-//                rateView.layer.animateAlpha(from: 0, to: 1, duration: 3)
+                
+                let inset: CGFloat = layout.size.width > 320.0 ? 45.0 : 30.0
                 
                 let closeButton = ModernCallCloseButton()
                 closeButton.addTarget(self, action: #selector(closePressed), forControlEvents: .touchUpInside)
                 self.containerNode.addSubnode(closeButton)
-//                closeButton.frame = self.buttonsNode.frame
-                closeButton.frame = CGRect(x: 45, y: self.buttonsNode.frame.minY, width: self.bounds.width - 90, height: 50)
-                closeButton.layer.animateAlpha(from: 0, to: 1, duration: 0.3)
+                closeButton.isHidden = true
+                
+                let buttonsHeight: CGFloat
+                if let buttonsMode = self.buttonsMode {
+                    buttonsHeight = self.buttonsNode.updateLayout(strings: self.presentationData.strings, mode: buttonsMode, constrainedWidth: layout.size.width, bottomInset: layout.intrinsicInsets.bottom, transition: .immediate)
+                } else {
+                    buttonsHeight = 0.0
+                }
+                let defaultButtonsOriginY = layout.size.height - buttonsHeight
+                
+                closeButton.frame = CGRect(x: inset, y: defaultButtonsOriginY + (56.0 - 50.0) / 2.0, width: self.bounds.width - 2 * inset, height: 50)
+                
+                rateView.frame = CGRect(x: inset, y: closeButton.frame.minY - 66 - 142, width: self.bounds.width - 2 * inset, height: 142)
+                
+                
+                let duration = 0.3
+                
+                let rateScale = CABasicAnimation(keyPath: "transform.scale")
+                rateScale.fromValue = 0.5
+                rateScale.duration = duration
+                rateScale.timingFunction = CAMediaTimingFunction(controlPoints: 0.4, 0.6, 0.4, 1.2)
+                rateView.layer.add(rateScale, forKey: "rateScale")
+                
+                rateView.layer.animateAlpha(from: 0, to: 1, duration: duration)
+                
+                if self.statusNode.frame.intersects(rateView.frame) {
+//                    self.statusNode.position.y -= 60.0
+//                    self.avatarNode.position.y -= 60.0
+                    let a = CABasicAnimation(keyPath: "transform")
+                    a.duration = duration
+                    a.toValue = CATransform3DTranslate(CATransform3DIdentity, 0, -100, 0)
+                    a.isRemovedOnCompletion = false
+                    a.fillMode = .forwards
+                    a.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                    self.statusNode.layer.add(a, forKey: "a")
+                    self.avatarNode.layer.add(a, forKey: "a")
+//                    self.statusNode.transform = CATransform3DTranslate(CATransform3DIdentity, 0, -100, 0)
+//                    self.avatarNode.transform = CATransform3DTranslate(CATransform3DIdentity, 0, -100, 0)
+                }
+                
+//                closeButton.layer.animateAlpha(from: 0, to: 1, duration: 0.3)
+                
+                
+                
+                guard let endCallButtonFrame = self.buttonsNode.endCallButtonFrame() else { return }
+                let endCallContainerFrame = self.buttonsNode.view.convert(endCallButtonFrame, to: self.containerNode.view)
+                
+                let closeText = ModernCloseImageLayer()
+                closeText.bounds.size = ModernCloseImageLayer.size
+                closeText.position = CGPoint(x: closeButton.bounds.width / 2 - (endCallContainerFrame.origin.x - closeButton.frame.origin.x),
+                                             y: closeButton.bounds.height / 2 - (endCallContainerFrame.origin.y - closeButton.frame.origin.y))
+                
+                let morph = CAShapeLayer()
+                morph.zPosition = zPositionUnderButtons
+                
+                morph.frame = endCallContainerFrame
+                morph.path = UIBezierPath(roundedRect: morph.bounds, cornerRadius: 28).cgPath
+                morph.fillColor = UIColor(rgb: 0xFF3B30).cgColor
+                morph.masksToBounds = true
+                
+                morph.addSublayer(closeText)
+                self.containerNode.layer.addSublayer(morph)
+                
+                let timing = CAMediaTimingFunction(name: .easeOut)
+                
+                let textPosition = CABasicAnimation(keyPath: "position")
+                textPosition.byValue = CGPoint(x: -(closeButton.frame.origin.x - endCallContainerFrame.origin.x),
+                                                y: -(closeButton.frame.origin.y - endCallContainerFrame.origin.y))
+                textPosition.duration = duration
+                textPosition.isRemovedOnCompletion = false
+                textPosition.fillMode = .forwards
+                textPosition.timingFunction = timing
+                closeText.add(textPosition, forKey: "textPosition")
+                
+                let size = CABasicAnimation(keyPath: "bounds.size")
+                size.toValue = closeButton.bounds.size
+                size.duration = duration
+                size.isRemovedOnCompletion = false
+                size.fillMode = .forwards
+                size.timingFunction = timing
+                morph.add(size, forKey: "boundsSize")
+
+                
+                let positionX = CABasicAnimation(keyPath: "position.x")
+                positionX.toValue = self.containerNode.bounds.width / 2.0
+                positionX.duration = duration
+                positionX.isRemovedOnCompletion = false
+                positionX.fillMode = .forwards
+                positionX.timingFunction = timing
+                positionX.completion = { _ in
+                    morph.removeFromSuperlayer()
+                    closeButton.isHidden = false
+                    closeButton.startAnimating()
+                }
+                morph.add(positionX, forKey: "positionX")
+                
+                let path = CABasicAnimation(keyPath: "path")
+                path.toValue = UIBezierPath(roundedRect: closeButton.bounds, cornerRadius: 14).cgPath
+                path.duration = duration
+                path.isRemovedOnCompletion = false
+                path.fillMode = .forwards
+                path.timingFunction = timing
+                morph.add(path, forKey: "path")
+                
+                let fillColor = CABasicAnimation(keyPath: "fillColor")
+                fillColor.toValue = UIColor.white.cgColor
+                fillColor.duration = duration
+                fillColor.isRemovedOnCompletion = false
+                fillColor.fillMode = .forwards
+                fillColor.timingFunction = timing
+                morph.add(fillColor, forKey: "fillColor")
+                
+                
                 
             }
 //            self.callEnded?(presentRating)
@@ -2338,4 +2451,31 @@ final class ModernCallPanGestureRecognizer: UIPanGestureRecognizer {
     override public func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
         super.touchesMoved(touches, with: event)
     }
+}
+
+private final class ModernCloseImageLayer: CALayer {
+    
+    override func action(forKey event: String) -> CAAction? {
+        return nil
+    }
+    
+    static let size = CGSize(width: 48, height: 22)
+    
+    override init() {
+        super.init()
+        
+        UIGraphicsBeginImageContextWithOptions(Self.size, false, UIScreen.main.scale)
+        guard let context = UIGraphicsGetCurrentContext() else {
+            fatalError()
+        }
+        
+        let textSize = CGSize(width: 45, height: 21)
+        let attributedString = NSAttributedString(string: "Close", font: Font.semibold(17), textColor: UIColor(rgb: 0x7261DA, alpha: 0.8))
+        attributedString.draw(in: CGRect(origin: CGPoint(x: (Self.size.width - textSize.width) / 2, y: (Self.size.height - textSize.height) / 2), size: textSize))
+        
+        
+        let image = context.makeImage()!
+        self.contents = image
+    }
+    required init?(coder: NSCoder) { fatalError() }
 }
