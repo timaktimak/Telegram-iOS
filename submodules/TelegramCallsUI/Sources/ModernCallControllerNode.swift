@@ -79,6 +79,9 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     
     private var removedMinimizedVideoNodeValue: (ModernCallVideoNodeProtocol & ASDisplayNode)?
     private var removedExpandedVideoNodeValue: (ModernCallVideoNodeProtocol & ASDisplayNode)?
+    private var isRemovingIncoming = false
+    private var isAddingIncoming = false
+    private var isAddingOutgoing = false
     
     private var isRequestingVideo: Bool = false
     
@@ -86,6 +89,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     private var hideUIForActiveVideoCallTimer: SwiftSignalKit.Timer?
     
     private var hideEmojiTooltipTimer: SwiftSignalKit.Timer?
+    private var hideEndCallUITimer: SwiftSignalKit.Timer?
     
     private var displayedCameraConfirmation: Bool = false
         
@@ -262,7 +266,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         self.containerNode.addSubnode(self.toastNode)
         self.keyButtonNode.zPosition = zPositionKey
         self.containerNode.addSubnode(self.keyButtonNode)
-        // TODO: timur remove?
+        
         if easyDebugAccess || !UserDefaults.standard.bool(forKey: "emoji-tooltip-pressed") {
             self.emojiTooltip.zPosition = zPositionEmojiTooltip
             self.containerNode.addSubnode(self.emojiTooltip)
@@ -378,13 +382,16 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                                     }
                                     
                                     strongSelf.outgoingVideoNodeValue = outgoingVideoNode
+                                    strongSelf.isAddingOutgoing = true
                                     
 //                                    outgoingVideoNode.removeFromSupernode()
                                     if strongSelf.expandedVideoNode != nil {
                                         strongSelf.minimizedVideoNode = outgoingVideoNode
+                                        strongSelf.minimizedVideoNode?.zPosition = zPositionMinimizedVideo
 //                                        strongSelf.videoContainerNode.contentNode.insertSubnode(outgoingVideoNode, aboveSubnode: expandedVideoNode)
                                     } else {
                                         strongSelf.expandedVideoNode = outgoingVideoNode
+                                        // animate zPosition
 //                                        strongSelf.videoContainerNode.contentNode.addSubnode(outgoingVideoNode)
                                     }
                                     strongSelf.updateButtonsMode(transition: .animated(duration: 0.4, curve: .spring))
@@ -459,6 +466,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
 
                                 strongSelf.containerNode.insertSubnode(wrapper, belowSubnode: strongSelf.buttonsNode) // recognizer
 
+//                                wrapper.zPosition = zPositionMinimizedVideo
                                 wrapper.frame = strongSelf.containerNode.bounds
                                 
                                 strongSelf.dismissKeyPreview()
@@ -701,8 +709,10 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                             strongSelf.candidateIncomingVideoNodeValue = nil
                             
                             strongSelf.incomingVideoNodeValue = incomingVideoNode
+                            strongSelf.isAddingIncoming = true
                             if let expandedVideoNode = strongSelf.expandedVideoNode {
                                 strongSelf.minimizedVideoNode = expandedVideoNode
+                                strongSelf.minimizedVideoNode?.zPosition = zPositionMinimizedVideo
                                 
 //                                strongSelf.videoContainerNode.insertSubnode(incomingVideoNode, belowSubnode: expandedVideoNode)
                             } else {
@@ -712,6 +722,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                             strongSelf.containerNode.insertSubnode(incomingVideoNode, at: 0)
                             
                             strongSelf.expandedVideoNode = incomingVideoNode
+                            strongSelf.expandedVideoNode?.zPosition = zPositionExpandedVideo
                             strongSelf.updateButtonsMode(transition: .animated(duration: 0.4, curve: .spring))
                             
                             strongSelf.maybeScheduleUIHidingForActiveVideoCall()
@@ -751,9 +762,11 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 if self.expandedVideoNode == incomingVideoNodeValue {
                     self.expandedVideoNode = nil
                     self.removedExpandedVideoNodeValue = incomingVideoNodeValue
+                    self.isRemovingIncoming = true
                     
                     if let minimizedVideoNode = self.minimizedVideoNode {
                         self.expandedVideoNode = minimizedVideoNode
+                        self.expandedVideoNode?.zPosition = zPositionExpandedVideo
                         self.minimizedVideoNode = nil
                     }
                 }
@@ -854,9 +867,11 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 if self.expandedVideoNode === self.outgoingVideoNodeValue {
                     self.expandedVideoNode = nil
                     self.removedExpandedVideoNodeValue = outgoingVideoNodeValue
+                    self.isRemovingIncoming = false
                     
                     if let minimizedVideoNode = self.minimizedVideoNode {
                         self.expandedVideoNode = minimizedVideoNode
+                        self.expandedVideoNode?.zPosition = zPositionExpandedVideo
                         self.minimizedVideoNode = nil
                     }
                 }
@@ -1035,7 +1050,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                     }
                 }, timestamp)
                 if case .active = callState.state {
-                    statusReception = reception.map { _ in 1 }
+                    statusReception = reception
                 }
         }
         if self.shouldStayHiddenUntilConnection {
@@ -1085,15 +1100,16 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             break
         }
         
-        if case let .terminated(_, _, reportRating) = callState.state {//, let callId = id {
+        if case let .terminated(id, _, reportRating) = callState.state, let callId = id {
             let presentRating = reportRating || self.forceReportRating
             if presentRating {
 //                self.presentCallRating?(callId, self.call.isVideo)
                 
                 guard let (layout, _) = self.validLayout else { return }
                 
-                let rateView = ModernCallRateNode(apply: { _ in
-                    
+                let rateView = ModernCallRateNode(apply: { [weak self] rating in
+                    guard let strongSelf = self else { return }
+                    let _ = rateCallAndSendLogs(engine: TelegramEngine(account: strongSelf.account), callId: callId, starsCount: rating, comment: "", userInitiated: false, includeLogs: false).start()
                 }, dismiss: { [weak self] in
                     self?.back?()
                 })
@@ -1217,6 +1233,13 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 morph.add(fillColor, forKey: "fillColor")
                 
                 
+                let timer = SwiftSignalKit.Timer(timeout: 8.3, repeat: false, completion: { [weak self] in
+                    self?.back?()
+                    self?.hideEmojiTooltipTimer?.invalidate()
+                    self?.hideEmojiTooltipTimer = nil
+                }, queue: Queue.mainQueue())
+                timer.start()
+                self.hideEndCallUITimer = timer
                 
             }
 //            self.callEnded?(presentRating)
@@ -1246,14 +1269,33 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
             case .waiting, .ringing:
                 self.backgroundNode.update(background: .connecting)
                 self.keyPreviewStorage.update(background: .connecting)
-            case .active:
-                self.backgroundNode.update(background: .active)
-                self.keyPreviewStorage.update(background: .active)
+                self.lastWeakNetworkTimestamp = nil
+            case .active(_, let reception, _),
+                    .reconnecting(_, let reception, _):
+                if let reception = reception, reception <= 1 {
+                    self.lastWeakNetworkTimestamp = self.lastWeakNetworkTimestamp ?? CACurrentMediaTime()
+                    if CACurrentMediaTime() - self.lastWeakNetworkTimestamp! > 2.0 {
+                        self.backgroundNode.update(background: .weakNetwork)
+                        self.keyPreviewStorage.update(background: .weakNetwork)
+                    }
+                } else {
+                    self.backgroundNode.update(background: .active)
+                    self.keyPreviewStorage.update(background: .active)
+                    self.lastWeakNetworkTimestamp = nil
+                }
+            case .terminating, .terminated:
+                self.backgroundNode.update(background: .connecting)
+                self.keyPreviewStorage.update(background: .connecting)
+                self.lastWeakNetworkTimestamp = nil
             default:
                 break
             }
         }
     }
+    
+    
+    private var lastWeakNetworkTimestamp: Double?
+    
     
     private var isShowingEndCallUI = false
     
@@ -1620,8 +1662,8 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
         let buttonsCollapsedOriginY = self.pictureInPictureTransitionFraction > 0.0 ? layout.size.height + 30.0 : layout.size.height + 10.0
         let buttonsOriginY = interpolate(from: buttonsCollapsedOriginY, to: defaultButtonsOriginY, value: uiDisplayTransition)
         
-        var toastHeight = self.toastNode.updateLayout(strings: self.presentationData.strings, content: self.toastContent, constrainedWidth: layout.size.width, bottomInset: layout.intrinsicInsets.bottom + buttonsHeight, transition: transition)
-        toastHeight = 30.0
+        let toastHeight = self.toastNode.updateLayout(strings: self.presentationData.strings, content: self.toastContent, constrainedWidth: layout.size.width, bottomInset: layout.intrinsicInsets.bottom + buttonsHeight, transition: transition)
+//        toastHeight = 30.0
         
         let toastSpacing: CGFloat = 22.0
         let toastCollapsedOriginY = self.pictureInPictureTransitionFraction > 0.0 ? layout.size.height : layout.size.height - max(layout.intrinsicInsets.bottom, 20.0) - toastHeight
@@ -1742,6 +1784,9 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 self.disableAnimationForExpandedVideoOnce = false
             }
             
+            
+//            expandedVideoTransition.updateZPosition(node: expandedVideoNode, zPosition: zPositionExpandedVideo)
+            
             if let removedExpandedVideoNodeValue = self.removedExpandedVideoNodeValue {
                 self.removedExpandedVideoNodeValue = nil
                 
@@ -1749,19 +1794,53 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                     removedExpandedVideoNodeValue?.removeFromSupernode()
                 })
             } else {
-                expandedVideoTransition.updateFrame(node: expandedVideoNode, frame: fullscreenVideoFrame)
+                let duration = 0.3
+                if self.isAddingIncoming {
+                    self.isAddingIncoming = false
+//                    expandedVideoNode.frame = fullscreenVideoFrame
+//                    expandedVideoNode.animateSpecialRadialMask(from: self.avatarNode.frame, to: fullscreenVideoFrame, duration: duration)
+                    expandedVideoNode.layer.animateFrame(from: self.avatarNode.frame, to: fullscreenVideoFrame, duration: duration)
+                    expandedVideoNode.layer.animateAlpha(from: 0.0, to: 1.0, duration: duration)
+                } else if self.isAddingOutgoing {
+                    self.isAddingOutgoing = false
+                    if self.minimizedVideoNode == nil {
+//                        expandedVideoNode.layer.animateKeyframes(values: [1.0 as NSNumber, 0.5 as NSNumber, 1.0 as NSNumber], duration: duration, keyPath: "transform.scale")
+                    
+                        expandedVideoNode.layer.removeAnimation(forKey: "zPosition")
+                        expandedVideoNode.layer.zPosition = 0
+                        expandedVideoNode.layer.animateScaleY(from: 1.0, to: 0.6, duration: duration / 2.0) { _ in
+                            expandedVideoNode.layer.zPosition = zPositionExpandedVideo
+                            expandedVideoNode.layer.animateScaleY(from: 0.6, to: 1.0, duration: duration / 2.0)
+                        }
+                    }
+                    
+                } else {
+                    expandedVideoTransition.updateFrame(node: expandedVideoNode, frame: fullscreenVideoFrame)
+                }
             }
             
-            transition.updateZPosition(node: expandedVideoNode, zPosition: zPositionExpandedVideo)
+            
             expandedVideoNode.updateLayout(size: expandedVideoNode.frame.size, cornerRadius: 0.0, isOutgoing: expandedVideoNode === self.outgoingVideoNodeValue, deviceOrientation: mappedDeviceOrientation, isCompactLayout: isCompactLayout, transition: expandedVideoTransition)
             
         } else {
             if let removedExpandedVideoNodeValue = self.removedExpandedVideoNodeValue {
                 self.removedExpandedVideoNodeValue = nil
+                let isRemovingIncoming = self.isRemovingIncoming
+                self.isRemovingIncoming = false
                 
                 if transition.isAnimated {
-                    removedExpandedVideoNodeValue.layer.animateScale(from: 1.0, to: 0.1, duration: 0.3, removeOnCompletion: false)
-                    removedExpandedVideoNodeValue.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.3, removeOnCompletion: false, completion: { [weak removedExpandedVideoNodeValue] _ in
+                    let duration = 0.3
+                    if isRemovingIncoming {
+                        removedExpandedVideoNodeValue.layer.animateFrame(from: fullscreenVideoFrame, to: self.avatarNode.frame, duration: duration)
+                        removedExpandedVideoNodeValue.layer.animate(from: 0.0 as NSNumber, to: self.avatarNode.frame.width / 2.0 as NSNumber, keyPath: "cornerRadius", timingFunction: CAMediaTimingFunctionName.easeInEaseOut.rawValue, duration: duration, removeOnCompletion: false)
+                        self.avatarNode.animateIn()
+                        
+//                        removedExpandedVideoNodeValue.animateSpecialRadialMask(from: fullscreenVideoFrame, to: self.avatarNode.frame, duration: duration)
+                        
+                    } else {
+                        removedExpandedVideoNodeValue.layer.animateScale(from: 1.0, to: 0.1, duration: duration, removeOnCompletion: false)
+                    }
+                    removedExpandedVideoNodeValue.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration, removeOnCompletion: false, completion: { [weak removedExpandedVideoNodeValue] _ in
                         removedExpandedVideoNodeValue?.removeFromSupernode()
                     })
                 } else {
@@ -1885,7 +1964,6 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
     }
     
     private func hideTooltip() {
-        // TODO: timur user defaults
         let duration = 0.2
         
         let tooltipScale = CABasicAnimation(keyPath: "transform.scale")
@@ -2083,24 +2161,24 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                 self.backPressed()
             } else {
                 if self.hasVideoNodes {
-                    let point = recognizer.location(in: recognizer.view)
-                    if let expandedVideoNode = self.expandedVideoNode, let minimizedVideoNode = self.minimizedVideoNode, minimizedVideoNode.frame.contains(point) {
-                        if !self.areUserActionsDisabledNow() {
-                            let copyView = minimizedVideoNode.view.snapshotView(afterScreenUpdates: false)
-                            copyView?.frame = minimizedVideoNode.frame
-                            self.expandedVideoNode = minimizedVideoNode
-                            self.minimizedVideoNode = expandedVideoNode
-                            if let supernode = expandedVideoNode.supernode {
-                                supernode.insertSubnode(expandedVideoNode, aboveSubnode: minimizedVideoNode)
-                            }
-                            self.disableActionsUntilTimestamp = CACurrentMediaTime() + 0.3
-                            if let (layout, navigationBarHeight) = self.validLayout {
-                                self.disableAnimationForExpandedVideoOnce = true
-                                self.animationForExpandedVideoSnapshotView = copyView
-                                self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .animated(duration: 0.3, curve: .easeInOut))
-                            }
-                        }
-                    } else {
+//                    let point = recognizer.location(in: recognizer.view)
+//                    if let _ = self.expandedVideoNode, let minimizedVideoNode = self.minimizedVideoNode, minimizedVideoNode.frame.contains(point) {
+//                        if !self.areUserActionsDisabledNow() {
+//                            let copyView = minimizedVideoNode.view.snapshotView(afterScreenUpdates: false)
+//                            copyView?.frame = minimizedVideoNode.frame
+//                            self.expandedVideoNode = minimizedVideoNode
+//                            self.minimizedVideoNode = expandedVideoNode
+//                            if let supernode = expandedVideoNode.supernode {
+//                                supernode.insertSubnode(expandedVideoNode, aboveSubnode: minimizedVideoNode)
+//                            }
+//                            self.disableActionsUntilTimestamp = CACurrentMediaTime() + 0.3
+//                            if let (layout, navigationBarHeight) = self.validLayout {
+//                                self.disableAnimationForExpandedVideoOnce = true
+//                                self.animationForExpandedVideoSnapshotView = copyView
+//                                self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .animated(duration: 0.3, curve: .easeInOut))
+//                            }
+//                        }
+//                    } else {
                         var updated = false
                         if let callState = self.callState {
                             switch callState.state {
@@ -2114,7 +2192,7 @@ final class ModernCallControllerNode: ViewControllerTracingNode, ModernCallContr
                         if updated, let (layout, navigationBarHeight) = self.validLayout {
                             self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .animated(duration: 0.3, curve: .easeInOut))
                         }
-                    }
+//                    }
                 } //else {
 //                    let point = recognizer.location(in: recognizer.view)
 //                    if self.statusNode.frame.contains(point) {

@@ -99,4 +99,10 @@ final class ModernCallAvatarNode: ASDisplayNode {
     }
     
     // TODO: timur figure out how to get audio volume
+    
+    
+    func animateIn() {
+        self.layer.animateScale(from: 1.4, to: 1.0, duration: 0.3)
+        self.layer.animateAlpha(from: 0.3, to: 1.0, duration: 0.3)
+    }
 }

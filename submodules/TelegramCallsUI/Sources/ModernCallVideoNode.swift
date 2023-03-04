@@ -24,6 +24,7 @@ protocol ModernCallVideoNodeProtocol {
     var currentOrientation: PresentationCallVideoView.Orientation { get }
     var currentAspect: CGFloat { get }
     func animateRadialMask(from fromRect: CGRect, to toRect: CGRect, completion: @escaping () -> Void)
+    func animateSpecialRadialMask(from fromRect: CGRect, to toRect: CGRect, duration: Double)
     func updateLayout(size: CGSize, layoutMode: VideoNodeLayoutMode, transition: ContainedViewLayoutTransition)
     func updateLayout(size: CGSize, cornerRadius: CGFloat, isOutgoing: Bool, deviceOrientation: UIDeviceOrientation, isCompactLayout: Bool, transition: ContainedViewLayoutTransition)
     func updateIsBlurred(isBlurred: Bool, light: Bool, animated: Bool)
@@ -68,7 +69,7 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
     private let contentBackgroundNode: ASDisplayNode
     private let titleNode: ASTextNode
     private let previewContainerNode: ASDisplayNode
-    private let shimmerNode: ShimmerEffectForegroundNode
+//    private let shimmerNode: ShimmerEffectForegroundNode
     private let doneButton: ModernPreviewDoneButton
     private var broadcastPickerView: UIView?
     private let cancelButton: HighlightableButtonNode
@@ -99,7 +100,6 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
         self.videoNode = videoNode
         
         self.wrappingScrollNode = ASScrollNode()
-        self.wrappingScrollNode.backgroundColor = UIColor.blue
         self.wrappingScrollNode.scrollableDirections = [.left, .right]
 //        self.wrappingScrollNode.view.alwaysBounceVertical = true
         self.wrappingScrollNode.view.delaysContentTouches = false
@@ -107,20 +107,18 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
         
         self.dimNode = ASDisplayNode()
         self.dimNode.backgroundColor = UIColor(white: 0.0, alpha: 0.5)
+        self.dimNode.cornerRadius = 16.0
         
         self.contentContainerNode = ASDisplayNode()
         self.contentContainerNode.isOpaque = false
-        self.contentContainerNode.backgroundColor = UIColor.cyan
 
         self.backgroundNode = ASDisplayNode()
         self.backgroundNode.clipsToBounds = true
         self.backgroundNode.cornerRadius = 16.0
-        self.backgroundNode.backgroundColor = UIColor.orange
-        
-//        let backgroundColor = UIColor(rgb: 0x000000)
+        let backgroundColor = UIColor(rgb: 0x000000)
     
         self.contentBackgroundNode = ASDisplayNode()
-        self.contentBackgroundNode.backgroundColor = UIColor.purple// backgroundColor
+        self.contentBackgroundNode.backgroundColor = backgroundColor
         
         let title =  self.presentationData.strings.VoiceChat_VideoPreviewTitle
         
@@ -146,8 +144,8 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
         self.previewContainerNode.cornerRadius = 11.0
         self.previewContainerNode.backgroundColor = UIColor(rgb: 0x2b2b2f)
         
-        self.shimmerNode = ShimmerEffectForegroundNode(size: 200.0)
-        self.previewContainerNode.addSubnode(self.shimmerNode)
+//        self.shimmerNode = ShimmerEffectForegroundNode(size: 200.0)
+//        self.previewContainerNode.addSubnode(self.shimmerNode)
                 
         self.placeholderTextNode = ImmediateTextNode()
         self.placeholderTextNode.alpha = 0.0
@@ -215,14 +213,14 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
         self.doneButton.addTarget(self, action: #selector(self.donePressed), forControlEvents: .touchUpInside)
         self.cancelButton.addTarget(self, action: #selector(self.cancelPressed), forControlEvents: .touchUpInside)
         
-        self.readyDisposable.set(self.videoNode.ready.start(next: { [weak self] ready in
-            if let strongSelf = self, ready {
-                Queue.mainQueue().after(0.07) {
-                    strongSelf.shimmerNode.alpha = 0.0
-                    strongSelf.shimmerNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.3)
-                }
-            }
-        }))
+//        self.readyDisposable.set(self.videoNode.ready.start(next: { [weak self] ready in
+//            if let strongSelf = self, ready {
+//                Queue.mainQueue().after(0.07) {
+//                    strongSelf.shimmerNode.alpha = 0.0
+//                    strongSelf.shimmerNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.3)
+//                }
+//            }
+//        }))
     }
     
     deinit {
@@ -451,9 +449,9 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
         previewSize = bounds.size
         previewFrame = bounds
         transition.updateFrame(node: self.previewContainerNode, frame: previewFrame)
-        transition.updateFrame(node: self.shimmerNode, frame: CGRect(origin: CGPoint(), size: previewFrame.size))
-        self.shimmerNode.update(foregroundColor: UIColor(rgb: 0xffffff, alpha: 0.07))
-        self.shimmerNode.updateAbsoluteRect(previewFrame, within: layout.size)
+//        transition.updateFrame(node: self.shimmerNode, frame: CGRect(origin: CGPoint(), size: previewFrame.size))
+//        self.shimmerNode.update(foregroundColor: UIColor(rgb: 0xffffff, alpha: 0.07))
+//        self.shimmerNode.updateAbsoluteRect(previewFrame, within: layout.size)
         
         let cancelButtonSize = self.cancelButton.measure(CGSize(width: (previewFrame.width - titleSize.width) / 2.0, height: .greatestFiniteMagnitude))
         let cancelButtonFrame = CGRect(origin: CGPoint(x: previewFrame.minX + 17.0, y: insets.top + 20.0), size: cancelButtonSize)
@@ -491,6 +489,8 @@ final class ModernCallPreviewableVideoNode: ASDisplayNode, UIScrollViewDelegate,
     
     var currentOrientation: PresentationCallVideoView.Orientation { videoNode.currentOrientation }
     var currentAspect: CGFloat { videoNode.currentAspect }
+    
+    func animateSpecialRadialMask(from fromRect: CGRect, to toRect: CGRect, duration: Double) {}
     
     func animateRadialMask(from fromRect: CGRect, to toRect: CGRect, completion: @escaping () -> Void = {}) {
         let maskLayer = CAShapeLayer()
@@ -778,7 +778,6 @@ final class ModernCallVideoNode: ASDisplayNode, PreviewVideoNode, ModernCallVide
         
         super.init()
         
-        self.backgroundColor = UIColor.gray
 //        self.backgroundColor = .black
         self.clipsToBounds = true
         
@@ -855,6 +854,60 @@ final class ModernCallVideoNode: ASDisplayNode, PreviewVideoNode, ModernCallVide
         if #available(iOS 13.0, *) {
             self.layer.cornerCurve = .continuous
         }
+    }
+    
+    func animateSpecialRadialMask(from fromRect: CGRect, to toRect: CGRect, duration: Double) {
+        let maskLayer = CAShapeLayer()
+        maskLayer.frame = self.videoTransformContainer.bounds
+//        maskLayer.frame = fromRect
+//        maskLayer.frame = fromRect
+        
+//        let path =
+//        path.addEllipse(in: CGRect(origin: CGPoint(), size: fromRect.size))
+        maskLayer.path = UIBezierPath(roundedRect: fromRect, cornerRadius: 0).cgPath
+        
+        self.videoTransformContainer.layer.mask = maskLayer
+        
+//        let topLeft = CGPoint(x: 0.0, y: 0.0)
+//        let topRight = CGPoint(x: self.bounds.width, y: 0.0)
+//        let bottomLeft = CGPoint(x: 0.0, y: self.bounds.height)
+//        let bottomRight = CGPoint(x: self.bounds.width, y: self.bounds.height)
+//
+//        func distance(_ v1: CGPoint, _ v2: CGPoint) -> CGFloat {
+//            let dx = v1.x - v2.x
+//            let dy = v1.y - v2.y
+//            return sqrt(dx * dx + dy * dy)
+//        }
+//
+//        var maxRadius = distance(toRect.center, topLeft)
+//        maxRadius = max(maxRadius, distance(toRect.center, topRight))
+//        maxRadius = max(maxRadius, distance(toRect.center, bottomLeft))
+//        maxRadius = max(maxRadius, distance(toRect.center, bottomRight))
+//        maxRadius = ceil(maxRadius)
+//
+//        let targetFrame = CGRect(origin: CGPoint(x: toRect.center.x - maxRadius, y: toRect.center.y - maxRadius), size: CGSize(width: maxRadius * 2.0, height: maxRadius * 2.0))
+        
+//        let transition: ContainedViewLayoutTransition = .animated(duration: 0.3, curve: .easeInOut)
+//        transition.updatePosition(layer: maskLayer, position: targetFrame.center)
+//        transition.updateTransformScale(layer: maskLayer, scale: maxRadius * 2.0 / fromRect.width, completion: { [weak self] _ in
+//            self?.layer.mask = nil
+//            completion()
+//        })
+        
+        let animation = CABasicAnimation(keyPath: "path")
+        animation.toValue = UIBezierPath(roundedRect: toRect, cornerRadius: 68).cgPath
+        animation.duration = duration
+        animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        animation.completion = { [weak self] _ in
+            self?.videoTransformContainer.layer.mask = nil
+        }
+        
+        maskLayer.add(animation, forKey: "anm")
+        
+        
+//        path.addEllipse(in: CGRect(origin: CGPoint(), size: fromRect.size))
+//        maskLayer.path = path.cgPath
+        
     }
     
     func animateRadialMask(from fromRect: CGRect, to toRect: CGRect, completion: @escaping () -> Void = {}) {

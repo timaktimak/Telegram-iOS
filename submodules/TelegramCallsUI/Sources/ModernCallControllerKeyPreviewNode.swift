@@ -64,7 +64,7 @@ private final class OverlayNode: ASDisplayNode {
         animateIfNeeded()
     }
     
-    private let duration = 0.6
+    private let duration = 0.4
     private func animateIfNeeded() {
         guard !isAnimating, let new = self.background, new != self.presentationBackground else { return }
         
