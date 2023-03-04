@@ -17,33 +17,78 @@ private let emojiFont = Font.regular(28.0)
 private let textFont = Font.regular(15.0)
 
 private final class OverlayNode: ASDisplayNode {
-    private let backgroundNode: WallpaperBackgroundNode
+    private var backgroundNodes: [ModernCallBackground: WallpaperBackgroundNode]
     private var background: ModernCallBackground?
     
+    private var isAnimating = false
+    private var presentationBackground: ModernCallBackground?
+    
     init(context: AccountContext) {
-        self.backgroundNode = createWallpaperBackgroundNode(context: context, forChatDisplay: false)
+        self.backgroundNodes = [:]
+        for bg in ModernCallBackground.allCases {
+            self.backgroundNodes[bg] = createWallpaperBackgroundNode(context: context, forChatDisplay: false)
+            self.backgroundNodes[bg]!.alpha = 0
+        }
         super.init()
+        for bg in ModernCallBackground.allCases {
+            self.addSubnode(self.backgroundNodes[bg]!)
+        }
         self.clipsToBounds = true
         self.isOpaque = true
-        self.addSubnode(self.backgroundNode)
     }
     
+    private var lastSize: CGSize?
     func update(size: CGSize) {
-        self.backgroundNode.frame.size = size
-        self.backgroundNode.updateLayout(size: size, transition: .immediate)
+        guard self.lastSize != size else { return }
+        self.lastSize = size
+        
+        for bg in ModernCallBackground.allCases {
+            self.backgroundNodes[bg]!.frame.size = size
+            self.backgroundNodes[bg]!.updateLayout(size: size, transition: .immediate)
+            
+            let gradient = TelegramWallpaper.Gradient(id: nil, colors: bg.colors, settings: WallpaperSettings(blur: true))
+            self.backgroundNodes[bg]!.update(wallpaper: .gradient(gradient))
+            
+            self.backgroundNodes[bg]!.updateIsLooping(true, duration: 0.4)
+        }
     }
     
     func update(shift: CGPoint) {
-        self.backgroundNode.frame.origin = CGPoint(x: -shift.x, y: -shift.y)
+        for bg in ModernCallBackground.allCases {
+            self.backgroundNodes[bg]!.frame.origin = CGPoint(x: -shift.x, y: -shift.y)
+        }
     }
     
     func update(background: ModernCallBackground) {
-        let gradient = TelegramWallpaper.Gradient(id: nil, colors: background.colors, settings: WallpaperSettings(blur: true))
-        backgroundNode.update(wallpaper: .gradient(gradient))
-        backgroundNode.updateIsLooping(false)
-        backgroundNode.updateIsLooping(true)
+        self.background = background
+        animateIfNeeded()
+    }
+    
+    private let duration = 0.6
+    private func animateIfNeeded() {
+        guard !isAnimating, let new = self.background, new != self.presentationBackground else { return }
+        
+        let old = self.presentationBackground
+        self.presentationBackground = new
+        
+        guard let actualOld = old else {
+            self.backgroundNodes[new]!.alpha = 1
+            return
+        }
+        
+        isAnimating = true
+                
+        self.backgroundNodes[actualOld]!.layer.zPosition = 0
+        self.backgroundNodes[new]!.layer.zPosition = 1
+        
+        self.backgroundNodes[new]!.alpha = 1
+        self.backgroundNodes[new]!.layer.animateAlpha(from: 0.0, to: 1.0, duration: duration) { _ in
+            self.isAnimating = false
+            self.animateIfNeeded()
+        }
     }
 }
+
 
 final class ModernCallControllerKeyPreviewNode: ASDisplayNode {
     private let titleTextNode: ASTextNode

@@ -67,6 +67,10 @@ private func makePipelineState(device: MTLDevice, library: MTLLibrary, vertexPro
 
 @available(iOS 13.0, *)
 final class MetalWallpaperBackgroundNode: ASDisplayNode, WallpaperBackgroundNode {
+    func updateIsLooping(_ isLooping: Bool, duration: Double) {
+        
+    }
+    
     private let device: MTLDevice
     private let metalLayer: SimpleMetalLayer
     private let commandQueue: MTLCommandQueue

@@ -95,6 +95,13 @@ final class ModernCallControllerKeyButton: HighlightableButtonNode {
             opacityAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
             node.layer.add(opacityAnimation, forKey: "opacityAnimation")
         }
+        
+//        let positionAnimation = CABasicAnimation(keyPath: "transform.translation.x")
+//        positionAnimation.byValue = -20.0
+//        positionAnimation.toValue = 0.0
+//        positionAnimation.duration = duration
+//        positionAnimation.timingFunction = timingFunction
+//        self.layer.add(positionAnimation, forKey: "positionAnimation")
     }
     
     func animateSpread(duration: Double) {

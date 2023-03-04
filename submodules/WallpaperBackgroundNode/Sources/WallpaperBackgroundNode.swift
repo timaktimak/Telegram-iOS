@@ -62,6 +62,7 @@ public protocol WallpaperBackgroundNode: ASDisplayNode {
     func _internalUpdateIsSettingUpWallpaper()
     func updateLayout(size: CGSize, transition: ContainedViewLayoutTransition)
     func updateIsLooping(_ isLooping: Bool)
+    func updateIsLooping(_ isLooping: Bool, duration: Double)
     func animateEvent(transition: ContainedViewLayoutTransition, extendAnimation: Bool)
     func updateBubbleTheme(bubbleTheme: PresentationTheme, bubbleCorners: PresentationChatBubbleCorners)
     func hasBubbleBackground(for type: WallpaperBubbleType) -> Bool
@@ -1134,6 +1135,15 @@ final class WallpaperBackgroundNodeImpl: ASDisplayNode, WallpaperBackgroundNode 
         }
     }
     
+    func updateIsLooping(_ isLooping: Bool, duration: Double) {
+        let wasLooping = self.isLooping
+        self.isLooping = isLooping
+        
+        if isLooping && !wasLooping {
+            self.animateEvent(transition: .animated(duration: duration, curve: .linear), extendAnimation: false)
+        }
+    }
+    
     func updateBubbleTheme(bubbleTheme: PresentationTheme, bubbleCorners: PresentationChatBubbleCorners) {
         if self.bubbleTheme !== bubbleTheme || self.bubbleCorners != bubbleCorners {
             self.bubbleTheme = bubbleTheme
@@ -1985,11 +1995,15 @@ final class WallpaperBackgroundNodeMergedImpl: ASDisplayNode, WallpaperBackgroun
     }
     
     func updateIsLooping(_ isLooping: Bool) {
+        updateIsLooping(isLooping, duration: 0.4)
+    }
+    
+    func updateIsLooping(_ isLooping: Bool, duration: Double) {
         let wasLooping = self.isLooping
         self.isLooping = isLooping
         
         if isLooping && !wasLooping {
-            self.animateEvent(transition: .animated(duration: 0.4, curve: .linear), extendAnimation: false)
+            self.animateEvent(transition: .animated(duration: duration, curve: .linear), extendAnimation: false)
         }
     }
 
